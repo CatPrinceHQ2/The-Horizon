@@ -1,0 +1,2835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Horizon (3D)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:#000;height:100%;width:100%;}
+  canvas{display:block;}
+  #ui{
+    position:fixed; top:10px; left:10px; z-index:10;
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    color:#eee; user-select:none;
+  }
+  .panel{
+    background:rgba(10,10,12,0.72);
+    border:1px solid rgba(255,255,255,0.15);
+    border-radius:10px;
+    padding:12px 14px;
+    width:260px;
+    backdrop-filter: blur(4px);
+  }
+  .panel h1{font-size:15px;margin:0 0 8px 0;font-weight:600;letter-spacing:0.5px;}
+  .panel label{font-size:11px;opacity:0.85;display:block;margin-top:6px;}
+  .row{display:flex;align-items:center;gap:8px;margin-top:4px;}
+  #slider{flex:1;}
+  #textbox{
+    width:46px;background:#111;color:#eee;border:1px solid #444;
+    border-radius:4px;padding:3px 4px;font-size:12px;text-align:center;
+  }
+  #distLabel{font-size:12px;color:#9fd6ff;margin-top:4px;display:block;}
+  #coords{
+    position:fixed; top:10px; right:10px; z-index:10;
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    color:#9fd6ff; font-size:12px; line-height:1.5;
+    background:rgba(10,10,12,0.72); border:1px solid rgba(255,255,255,0.15);
+    border-radius:10px; padding:8px 12px; user-select:none;
+    backdrop-filter: blur(4px);
+  }
+  #stats{font-size:11px;opacity:0.7;margin-top:8px;line-height:1.5;}
+  .hint{font-size:10.5px;opacity:0.55;margin-top:10px;line-height:1.4;}
+  #crosshair{
+    position:fixed; top:50%; left:50%; width:6px; height:6px;
+    margin:-3px 0 0 -3px; border-radius:50%;
+    background:rgba(255,255,255,0.55); pointer-events:none; z-index:9;
+  }
+  #miningBar{
+    position:fixed; top:50%; left:50%; margin:22px 0 0 -40px;
+    width:80px; height:6px; border-radius:3px;
+    background:rgba(255,255,255,0.15); overflow:hidden;
+    pointer-events:none; z-index:9; display:none;
+  }
+  #miningBarFill{ height:100%; width:0%; background:#ffcf6b; }
+  #hotbar{
+    position:fixed; left:50%; bottom:16px; transform:translateX(-50%);
+    display:flex; gap:6px; z-index:10; user-select:none;
+  }
+  .hotslot{
+    width:52px; height:52px; border-radius:8px;
+    background:rgba(10,10,12,0.72); border:1px solid rgba(255,255,255,0.25);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    font-family:-apple-system,"Segoe UI",Arial,sans-serif; color:#eee; font-size:11px;
+  }
+  .hotslot .swatch{ width:20px; height:20px; border-radius:4px; margin-bottom:3px; }
+</style>
+</head>
+<body>
+<div id="crosshair"></div>
+<div id="coords">x: -- &nbsp; y: -- &nbsp; z: --</div>
+<div id="miningBar"><div id="miningBarFill"></div></div>
+<div id="hotbar"></div>
+<div id="ui">
+  <div class="panel">
+    <h1>THE HORIZON <span style="opacity:.5">(3D)</span></h1>
+    <label>View Distance Level (<span id="levelVal">2</span> / 22)</label>
+    <div class="row">
+      <input id="slider" type="range" min="1" max="22" step="1" value="2">
+      <input id="textbox" type="number" min="1" max="22" step="1" value="2">
+    </div>
+    <span id="distLabel">Approx. distance: --</span>
+    <label>Layer Cutoff — chunks/ring before next LOD (<span id="ringVal">2</span>)</label>
+    <div class="row">
+      <input id="ringSlider" type="range" min="1" max="5" step="1" value="2">
+      <input id="ringTextbox" type="number" min="1" max="5" step="1" value="2">
+    </div>
+    <div id="stats">FPS: -- &nbsp;|&nbsp; Chunks: -- &nbsp;|&nbsp; Tris: --</div>
+    <div class="hint">Click the screen to look around &middot; WASD to walk &middot; Space to jump &middot; Shift to sprint &middot; hold Left Click to mine &middot; E to free/re-lock the cursor</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+
+/* =========================================================================
+   THE HORIZON (3D) — infinite LOD terrain "far plane" renderer.
+   ---------------------------------------------------------------------
+   Design notes (read for the intent behind the code below):
+
+   - Terrain is generated procedurally from simplex noise, chunked into a
+     concentric-ring "clipmap" style LOD (conceptually similar to how
+     CWGFarPlaneView / FarPlaneTwo render Minecraft's far terrain): near
+     the player, chunks are small and dense; each ring farther out doubles
+     in world-space size while keeping the SAME vertex/triangle budget per
+     chunk, so detail (and cost) per chunk stays roughly constant while
+     the world-space area it covers grows exponentially. That's how a
+     single ring of chunks can represent "millions of km" of horizon.
+
+   - The camera uses a custom INFINITE FAR PLANE, REVERSE-Z projection
+     matrix. Reverse-Z (near maps to depth=1, infinity maps to depth=0,
+     tested with GL_GREATER) keeps floating point depth precision dense
+     near the camera *and* far away, which is what lets us draw geometry
+     out to an effectively infinite distance without z-fighting or being
+     clipped by a far plane. See updateProjectionMatrix() below.
+
+   - Each chunk is built as a heightfield grid, converted into a normal
+     indexed triangle mesh, then decimated by a constrained iterative
+     edge-collapse simplifier using Quadric Error Metrics (Garland-
+     Heckbert QEM) — bounded by both a per-LOD triangle budget and a
+     maximum geometric error, with explicit triangle-quality, dihedral-
+     angle (ridge/valley feature preservation), and topology constraints
+     rejecting any collapse that would create flipped, degenerate, or
+     needle-like triangles. See simplifyMeshQEM() for the full algorithm.
+
+   - Per-chunk frustum culling (Three.js bounding-sphere test) and
+     standard GPU backface culling (consistent triangle winding +
+     FrontSide) are both enabled. Chunk generation is spread across
+     frames via a small queue so changing the view-distance slider
+     doesn't cause a big hitch.
+
+   These are explicitly "lay the basics down" implementations — flagged
+   in comments where a production version would go further.
+   ========================================================================= */
+
+// ---------------------------------------------------------------------
+// Simplex noise (classic Gustavson-style 2D simplex, seeded permutation)
+// ---------------------------------------------------------------------
+class SimplexNoise {
+  constructor(seed = 1337) {
+    this.p = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) this.p[i] = i;
+    let s = seed >>> 0;
+    const rand = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      const t = this.p[i]; this.p[i] = this.p[j]; this.p[j] = t;
+    }
+    this.perm = new Uint8Array(512);
+    this.permMod12 = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) {
+      this.perm[i] = this.p[i & 255];
+      this.permMod12[i] = this.perm[i] % 12;
+    }
+  }
+  noise2D(xin, yin) {
+    const grad3 = SimplexNoise.GRAD3;
+    const F2 = 0.5 * (Math.sqrt(3) - 1);
+    const G2 = (3 - Math.sqrt(3)) / 6;
+    const s = (xin + yin) * F2;
+    const i = Math.floor(xin + s), j = Math.floor(yin + s);
+    const t = (i + j) * G2;
+    const X0 = i - t, Y0 = j - t;
+    const x0 = xin - X0, y0 = yin - Y0;
+    let i1, j1;
+    if (x0 > y0) { i1 = 1; j1 = 0; } else { i1 = 0; j1 = 1; }
+    const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2;
+    const x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+    const ii = i & 255, jj = j & 255;
+    const gi0 = this.permMod12[ii + this.perm[jj]];
+    const gi1 = this.permMod12[ii + i1 + this.perm[jj + j1]];
+    const gi2 = this.permMod12[ii + 1 + this.perm[jj + 1]];
+    let n0 = 0, n1 = 0, n2 = 0;
+    let t0 = 0.5 - x0 * x0 - y0 * y0;
+    if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * (grad3[gi0][0] * x0 + grad3[gi0][1] * y0); }
+    let t1 = 0.5 - x1 * x1 - y1 * y1;
+    if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * (grad3[gi1][0] * x1 + grad3[gi1][1] * y1); }
+    let t2 = 0.5 - x2 * x2 - y2 * y2;
+    if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * (grad3[gi2][0] * x2 + grad3[gi2][1] * y2); }
+    return 70 * (n0 + n1 + n2);
+  }
+}
+SimplexNoise.GRAD3 = [
+  [1,1],[-1,1],[1,-1],[-1,-1],
+  [1,0],[-1,0],[1,0],[-1,0],
+  [0,1],[0,-1],[0,1],[0,-1]
+];
+
+const noise = new SimplexNoise(20260819);
+
+// ---------------------------------------------------------------------
+// Terrain shaping — fbm noise + a guaranteed tallest "spawn mountain"
+// ---------------------------------------------------------------------
+const WORLD_HEIGHT    = 512;        // overall peak-to-valley vertical scale of the world
+const BASE_AMPLITUDE  = 260;        // ridged-mountain amplitude
+const BASE_FREQ       = 1/320;      // lower freq than before -> wider, BIGGER mountains
+const OCTAVES         = 5;
+const VALLEY_FREQ     = BASE_FREQ / 4;   // much broader wavelength -> large valleys/plateaus
+const VALLEY_AMPLITUDE= 160;             // how deep/wide the valley carving swings
+const PEAK_AMPLITUDE  = WORLD_HEIGHT;    // spawn mountain height (dominant everywhere)
+const PEAK_SIGMA      = 300;             // spawn mountain radius (gaussian falloff)
+
+function heightAt(x, z) {
+  const d2 = x * x + z * z;
+  const peak = PEAK_AMPLITUDE * Math.exp(-d2 / (2 * PEAK_SIGMA * PEAK_SIGMA));
+  // Suppress ordinary terrain near the spawn point (mask -> 0 at the origin,
+  // -> 1 far away) so the spawn peak above is deterministically the tallest
+  // point in the world — it can't be out-rolled by a lucky noise value
+  // elsewhere, which a simple additive peak could allow once amplitudes
+  // get this large.
+  const spawnMask = 1 - Math.exp(-d2 / (2 * PEAK_SIGMA * PEAK_SIGMA));
+
+  // Ridged fbm (1 - |noise|) makes sharp mountain ridgelines instead of
+  // smooth rolling bumps, so mountains read as much bigger at the same
+  // amplitude and don't statistically average back toward flat far away.
+  let amp = 1, freq = BASE_FREQ, sum = 0, norm = 0;
+  for (let o = 0; o < OCTAVES; o++) {
+    const n = noise.noise2D(x * freq, z * freq);
+    sum += (1 - Math.abs(n)) * amp;
+    norm += amp;
+    amp *= 0.5; freq *= 2;
+  }
+  const ridge = sum / norm; // 0..1, spikes toward 1 along ridgelines
+
+  // Very low-frequency mask that carves broad valleys between mountain
+  // ranges (and raises broad plateaus elsewhere).
+  const valley = noise.noise2D(x * VALLEY_FREQ, z * VALLEY_FREQ); // -1..1
+
+  const generic = ridge * BASE_AMPLITUDE + valley * VALLEY_AMPLITUDE;
+  return generic * spawnMask + peak;
+}
+
+// ---------------------------------------------------------------------
+// Chunk / LOD configuration
+// ---------------------------------------------------------------------
+const BASE_CHUNK_SIZE = 64;   // world-space size of a level-0 chunk (the "a" in a*a)
+const RES = 10;               // grid subdivisions per chunk edge — CONSTANT across levels,
+                               // so every LOD level costs about the same to build/draw.
+let RING_RADIUS = 2;          // chunks in each direction rendered per LOD ring/layer
+                               // before dropping to the next, coarser layer —
+                               // user-adjustable, see ringSlider below.
+const SKIRT_DEPTH_BASE = 6;   // vertical skirt depth at level 0, to hide LOD seams
+
+function chunkWorldSize(level) { return BASE_CHUNK_SIZE * Math.pow(2, level); }
+
+// ---------------------------------------------------------------------
+// Terrain edits (mining): breaking a triangle modifies the height "noise
+// point" at that world column, permanently and independent of LOD level —
+// buildChunk() (any level) reads terrainHeight()/terrainHardness() below
+// instead of calling the raw heightAt() directly, so every chunk that
+// resamples that column, at whatever LOD it happens to be drawn at,
+// picks the edit up.
+//
+// Edits live on a fixed FINEST-grid resolution (the level-0 chunk grid),
+// keyed by integer column coordinates, independent of whatever LOD level
+// currently covers a given world point. Each column stores an ARRAY of
+// "bands" — sorted top to bottom — rather than one scalar height. Right
+// now mining only ever touches bands[0] (straight-down digging), but
+// keeping the column as a stack instead of a single number means a future
+// feature that tunnels in from the side and needs a second, independent
+// surface crossing at the same (x,z) — a ceiling above, a floor below —
+// has somewhere to go without a data-model rewrite: buildChunk() and the
+// mining raycast both already treat "the surface at this column" as
+// "the topmost band," so y-overlapping terrain is additive to this file
+// later, not a rewrite of it.
+// ---------------------------------------------------------------------
+const MINE_STEP    = chunkWorldSize(0) / RES; // finest HEIGHTFIELD grid spacing == the ordinary chunk's own
+                                               // "noise point" resolution. No longer mining's own storage
+                                               // granularity (see DENS_STEP below) — kept only as the default
+                                               // invalidation margin, since that's about how coarse a chunk's
+                                               // own sampling grid is, not about how mining is stored.
+const LAYER_STEP   = 1;                       // world-units of depth below a column's NATURAL height
+                                               // that count as one "layer" (1% hardness) — see terrainHardness().
+                                               // 1 unit/% means 100% (unminable) lands exactly 100 units down.
+const MAX_HARDNESS = 100;                     // 100% = bedrock, unminable
+const MINE_RADIUS  = 1.5;                     // world-units radius of the spherical chunk removed per mine —
+                                               // kept comfortably under MINE_RANGE so a sideways dig doesn't
+                                               // reach all the way back and eat the floor under the player's
+                                               // own feet. 4x smaller than the original 6 (balanced below by
+                                               // MINE_SPEED_MULT digging 8x faster, so a smaller circle still
+                                               // clears volume at a reasonable overall rate).
+const MINE_SPEED_MULT = 8;                    // digging is this many times faster than the base 1s/0%-hardness
+                                               // rate in updateMining() — pairs with the 4x-smaller MINE_RADIUS
+                                               // above so precision goes up without mining overall feeling slower.
+
+// ---------------------------------------------------------------------
+// TERRAIN EDITS v2 — a real 3D density field instead of per-column bands.
+// ---------------------------------------------------------------------
+// The old model stored, per (x,z) column, a small sorted array of solid
+// Y-spans ("bands"). That worked, but it was still fundamentally a
+// heightfield trick: every dig had to be expressed as "split a span in
+// two", and the near-field renderer needed a SECOND, independent
+// triangulator (Surface Nets over sampleDensityBands()) just for columns
+// that happened to have more than one span, carefully masked against the
+// ordinary flat quad grid so the two didn't both draw over the same
+// ground at once. That mask/box-padding dance is exactly what caused the
+// z-fighting/flicker this rewrite exists to fix.
+//
+// The replacement: mining now subtracts a sphere directly from a true 3D
+// signed-density field via the standard SDF/CSG trick — new density at a
+// point is min(old density, distanceToSphereCenter - radius). That
+// expression is negative (air) inside the sphere and unchanged outside
+// it, so a long series of overlapping digs (the "vacuum snaking through
+// rock" motion) just keeps taking the min — round, continuous, and never
+// needs to know or care whether it's carving straight down, sideways
+// into a cliff, or through the wall of a tunnel that's already there.
+// This is the same technique Astroneer's devs have described publicly
+// for their deformable terrain: a chunked density volume, marching
+// cubes (we use naive Surface Nets, already implemented below) to
+// polygonize it, and deformation = edit the density data + repolygonize
+// just the affected chunk.
+//
+// Edits are stored SPARSELY, keyed to a fixed GLOBAL voxel lattice
+// (DENS_STEP world units on every axis) — not per-chunk arrays — so two
+// neighboring chunks sampling the same lattice point always agree
+// exactly (same deterministic function of world position), which is
+// what makes chunk borders seamless with no separate vertex-stitching
+// step: see buildFinePatchChunk() below.
+const DENS_STEP = 2.0; // world units between density-lattice points on every axis. This doubles as the
+                        // near-field mesh's own voxel size (VOL_VOXEL_SIZE_DEFAULT, defined as an alias
+                        // for this same constant further down where the rest of the near-field/LOD-0
+                        // volumetric renderer lives) — the lattice IS the mesh resolution, so there's only
+                        // ever one "voxel size" for the whole mining+meshing system, not two that could
+                        // drift apart.
+
+const densityEdits = new Map();   // "i,j,k" (lattice indices) -> overridden density value (mined points only)
+const minedColumns  = new Set();  // "i,k" (XZ lattice indices) -> this column has at least one mined point.
+                                   // Lets terrainHeight()/getBands() fast-path straight back to the plain
+                                   // analytic heightAt() for the overwhelming majority of never-mined
+                                   // terrain, and only pay for a density march on columns actually dug.
+
+// level-0 chunk key ("cx,cz") -> { minY, maxY } world-Y bounds of every
+// density edit that has landed in that chunk's footprint. Maintained
+// incrementally by completeMine() below. Two jobs: (1) neededSet() uses
+// its keys to force a chunk with any mining in it to always be built as
+// a "fine" (volumetric) chunk, exactly like the old tunnelChunkCounts —
+// otherwise a tunnel's walls only exist while the player happens to be
+// standing near them, see the comment at its old definition (removed)
+// for why that matters; (2) buildFinePatchChunk() uses the Y bounds
+// directly, so a deep-mined chunk's volumetric sampling box is exactly
+// as tall as it needs to be — no taller — see the "auto-coarsen safety
+// net" note at buildFinePatchChunk(). Never needs to shrink back down:
+// mining is subtraction-only, so a chunk's mined footprint only ever
+// grows.
+const minedChunkBounds = new Map();
+function level0ChunkKeyFor(wx, wz) {
+  const size0 = chunkWorldSize(0);
+  return Math.floor(wx / size0) + ',' + Math.floor(wz / size0);
+}
+function level0ChunkXZFromKey(key) {
+  const parts = key.split(',');
+  return [Number(parts[0]), Number(parts[1])];
+}
+
+function densLatticeIndex(v) { return Math.round(v / DENS_STEP); }
+function densKey(i, j, k) { return i + ',' + j + ',' + k; }
+// Kept for the mining-progress UI (updateMining() below), which only
+// needs "is this still roughly the same spot I was just aiming at" —
+// any stable, deterministic key on the same lattice works.
+function mineColKey(x, z) { return densLatticeIndex(x) + ',' + densLatticeIndex(z); }
+
+// Bedrock is a hard, uniform cutoff below each column's OWN natural
+// surface (not a world-flat Y), so hilltops and valleys both get the same
+// 100-unit-deep minable shell.
+function bedrockYFor(naturalY) { return naturalY - MAX_HARDNESS * LAYER_STEP; }
+
+// Live density at a world point, given its column's NATURAL height
+// (pass a cached heightAt(x,z) when sampling many points up/down the
+// same column — see buildFinePatchChunk() — to avoid paying for the
+// noise function on every single sample). Positive = solid, negative =
+// air, matching sampleDensity()'s original sign convention.
+function densityAt(x, y, z, naturalY) {
+  const key = densKey(densLatticeIndex(x), densLatticeIndex(y), densLatticeIndex(z));
+  const edit = densityEdits.get(key);
+  return edit !== undefined ? edit : (naturalY - y);
+}
+// Convenience wrapper for callers that don't already have naturalY handy.
+function sampleDensity(x, y, z) { return densityAt(x, y, z, heightAt(x, z)); }
+
+// Reconstructs the OLD bands[] view (sorted top-to-bottom solid spans) by
+// marching the live density field, so every collision/rendering call
+// site that already speaks "bands" (groundBelowFeet, steppableLandingY,
+// headroomBlocked, terrainHeight/terrainHardness below) keeps working
+// completely unchanged — bands are now a VIEW derived from the density
+// field on demand, not the underlying storage. Fast path: an unmined
+// column (the overwhelming majority of the world) skips the march
+// entirely and returns the single natural span, exactly like before, at
+// the same cost as before.
+function getBands(x, z) {
+  const ci = densLatticeIndex(x), ck = densLatticeIndex(z);
+  let nearMined = false;
+  outer: for (let dk = -1; dk <= 1; dk++)
+    for (let di = -1; di <= 1; di++)
+      if (minedColumns.has((ci + di) + ',' + (ck + dk))) { nearMined = true; break outer; }
+  const naturalY = heightAt(x, z);
+  const bedrockY = bedrockYFor(naturalY);
+  if (!nearMined) return [{ top: naturalY, bottom: bedrockY }];
+
+  // Slow path: mining is subtraction-only, so density can never rise
+  // above its natural value — nothing can exist above `top`, and nothing
+  // below `bedrockY` is ever touched (completeMine() refuses to carve
+  // there) — so this march only ever needs to cover exactly the
+  // column's original minable shell, same range the old model used.
+  const top = naturalY + DENS_STEP;
+  const spans = [];
+  function crossing(yHi, yLo) {
+    let lo = yLo, hi = yHi;
+    for (let it = 0; it < 10; it++) {
+      const mid = (lo + hi) / 2;
+      if (densityAt(x, mid, z, naturalY) >= 0) hi = mid; else lo = mid;
+    }
+    return hi;
+  }
+  let y = top, d = densityAt(x, y, z, naturalY), spanTop = d >= 0 ? top : null;
+  for (let ny = top - DENS_STEP; ny >= bedrockY; ny -= DENS_STEP) {
+    const nd = densityAt(x, ny, z, naturalY);
+    if (d < 0 && nd >= 0) spanTop = crossing(y, ny);           // air -> solid: a span begins
+    else if (d >= 0 && nd < 0) {                                // solid -> air: a span ends
+      spans.push({ top: spanTop, bottom: crossing(y, ny) });
+      spanTop = null;
+    }
+    y = ny; d = nd;
+  }
+  if (spanTop !== null) spans.push({ top: spanTop, bottom: bedrockY }); // still solid at the bedrock cutoff
+  if (spans.length === 0) spans.push({ top: bedrockY, bottom: bedrockY }); // hollowed all the way to bedrock
+  return spans;
+}
+// What buildChunk() samples in place of heightAt() — the LIVE (possibly
+// mined) TOP surface at this world column. Only the topmost span matters
+// here; whatever's hollowed out underneath doesn't change what a distant
+// or coarse-LOD chunk draws for the ground itself.
+function terrainHeight(x, z) { return getBands(x, z)[0].top; }
+// 0..100 — how far BELOW a NATURAL surface height (heightAt(), unaffected
+// by edits) some live Y sits, in world-units, normalized by LAYER_STEP so
+// it reads as "1% per LAYER_STEP units of depth". Shared by the top-
+// surface case (terrainHardness) and by interior tunnel-wall vertices in
+// the volumetric patch, which pass the wall's own Y rather than a
+// column's top band.
+function hardnessAtY(naturalY, y) {
+  return Math.min(MAX_HARDNESS, Math.max(0, (naturalY - y) / LAYER_STEP));
+}
+// Drives mining time, top-surface redness, and which material a mined
+// triangle rounds to (materialTypeForHardness). Computed fresh from actual
+// depth (not an action counter) so it stays correct for the spherical dig
+// below, which can remove a different depth at every column in one action.
+//
+// BUG FIXED: this used to take only (x, z) and read terrainEdits[key][0].top
+// — the CURRENT TOP-MOST band at that column — as a stand-in for "how deep
+// is the thing I'm looking at". That's only ever true when you're mining
+// straight down at the exposed top surface. The moment a tunnel exists and
+// you aim sideways at a wall (or up at a ceiling, or into a lower band), the
+// point you're actually hitting can be nowhere near that column's top band
+// — most dangerously, a column that's already been dug all the way to
+// bedrock at its (rounded) center reports hardness 100 for ANY point near
+// it, so a sideways swing that merely grazes that column's rounded key got
+// silently rejected as "bedrock, can't mine" even though the actual wall
+// you were aiming at was ordinary rock. Taking the real hit Y and computing
+// depth directly (matching what the comment above always claimed this did)
+// fixes mining/tunneling in every direction, not just straight down.
+function terrainHardness(x, y, z) {
+  return hardnessAtY(heightAt(x, z), y);
+}
+
+
+// ---------------------------------------------------------------------
+// Constrained mesh simplification: iterative edge collapse + Quadric
+// Error Metrics (Garland–Heckbert), replacing the old axis-aligned
+// rectangle-merge. buildChunk() below builds a normal indexed grid mesh
+// first, then hands it to simplifyMeshQEM() to decimate it down to a
+// per-LOD triangle budget, subject to a bounded geometric error and a
+// set of hard triangle-quality / topology / feature-preservation
+// constraints (see the per-constraint comments inside evaluateEdge).
+// ---------------------------------------------------------------------
+
+// --- tunable QEM parameters (named constants, starting values — see
+// the LOD config block above for the sibling constants this replaces) ---
+const QEM_ANGLE_EASY_DEG         = 10;   // <= this dihedral angle between two faces: ordinary/cheap simplification
+const QEM_ANGLE_PROTECT_DEG      = 20;   // >  this dihedral angle: treated as a protected ridge/valley feature
+const QEM_ANGLE_TINY_ERROR       = 1e-4; // a protected-angle edge may still collapse if its raw QEM error is below this
+const QEM_MIN_QUALITY_HARD       = 0.05; // 4*sqrt(3)*area/(sum of squared edge lengths) — triangles below this are always rejected
+const QEM_QUALITY_SOFT_TARGET    = 0.35; // triangles below this (but above the hard floor) get a soft cost penalty
+const QEM_QUALITY_PENALTY_K      = 6.0;  // strength of the soft quality penalty
+const QEM_MAX_ASPECT_RATIO       = 12.0; // longest-edge / shortest-edge hard cap for any triangle affected by a collapse
+const QEM_MIN_AREA_FRACTION      = 0.01; // reject a resulting triangle smaller than this fraction of one original grid-cell triangle
+const QEM_MAX_DISPLACEMENT_STEPS = 3.0;  // reject a solved QEM position further than this many grid-steps from the collapsing edge
+const QEM_MAX_ERROR_BASE         = 0.35; // geometric-error budget (world units^2) at level 0 — scales with chunk size like MERGE_EPS_BASE used to
+const QEM_TARGET_TRI_FRACTION    = [1.0, 0.55, 0.35, 0.25, 0.18, 0.14]; // target triangle-count fraction of the unsimplified mesh, per LOD level
+const QEM_TARGET_FRACTION_DECAY  = 0.85; // further multiplicative decay per level beyond the table above
+const QEM_TARGET_FRACTION_MIN    = 0.08; // never target fewer than this fraction of the original triangle count
+
+function qemTargetTriCount(level, initialTriCount) {
+  const table = QEM_TARGET_TRI_FRACTION;
+  let frac = level < table.length
+    ? table[level]
+    : table[table.length - 1] * Math.pow(QEM_TARGET_FRACTION_DECAY, level - (table.length - 1));
+  frac = Math.max(QEM_TARGET_FRACTION_MIN, frac);
+  return Math.max(8, Math.round(initialTriCount * frac));
+}
+
+// --- quadric (symmetric 4x4, stored as its 10 unique entries) helpers ---
+// Layout: [a11,a12,a13,a14, a22,a23,a24, a33,a34, a44]
+function quadricFromPlane(a, b, c, d) {
+  return new Float64Array([a*a, a*b, a*c, a*d, b*b, b*c, b*d, c*c, c*d, d*d]);
+}
+function quadricAddInPlace(dst, src) { for (let i = 0; i < 10; i++) dst[i] += src[i]; }
+function quadricAdd(q1, q2) {
+  const out = new Float64Array(10);
+  for (let i = 0; i < 10; i++) out[i] = q1[i] + q2[i];
+  return out;
+}
+function quadricError(Q, x, y, z) {
+  const a11=Q[0],a12=Q[1],a13=Q[2],a14=Q[3], a22=Q[4],a23=Q[5],a24=Q[6], a33=Q[7],a34=Q[8], a44=Q[9];
+  return a11*x*x + 2*a12*x*y + 2*a13*x*z + 2*a14*x
+       + a22*y*y + 2*a23*y*z + 2*a24*y
+       + a33*z*z + 2*a34*z
+       + a44;
+}
+// Solve the 3x3 linear system from dE/d(x,y,z)=0 (Garland-Heckbert §3.2)
+// for the position that minimizes v^T Q v. Returns null if the system is
+// singular/ill-conditioned, in which case the caller falls back to v1,
+// v2, or their midpoint — whichever has the lowest error.
+function quadricOptimalPosition(Q) {
+  const a11=Q[0],a12=Q[1],a13=Q[2],a14=Q[3], a22=Q[4],a23=Q[5],a24=Q[6], a33=Q[7],a34=Q[8];
+  const m00=a11,m01=a12,m02=a13, m10=a12,m11=a22,m12=a23, m20=a13,m21=a23,m22=a33;
+  const r0=-a14, r1=-a24, r2=-a34;
+  const det = m00*(m11*m22 - m12*m21) - m01*(m10*m22 - m12*m20) + m02*(m10*m21 - m11*m20);
+  if (Math.abs(det) < 1e-9) return null;
+  const invDet = 1 / det;
+  const x = invDet * ( r0*(m11*m22-m12*m21) - m01*(r1*m22-m12*r2) + m02*(r1*m21-m11*r2) );
+  const y = invDet * ( m00*(r1*m22-m12*r2) - r0*(m10*m22-m12*m20) + m02*(m10*r2-r1*m20) );
+  const z = invDet * ( m00*(m11*r2-r1*m21) - m01*(m10*r2-r1*m20) + r0*(m10*m21-m11*m20) );
+  return { x, y, z };
+}
+
+function triNormalArea(px,py,pz, qx,qy,qz, rx,ry,rz) {
+  const abx=qx-px, aby=qy-py, abz=qz-pz;
+  const acx=rx-px, acy=ry-py, acz=rz-pz;
+  let nx = aby*acz - abz*acy, ny = abz*acx - abx*acz, nz = abx*acy - aby*acx;
+  const len = Math.hypot(nx, ny, nz);
+  const area = len * 0.5;
+  if (len > 1e-12) { nx/=len; ny/=len; nz/=len; }
+  return { nx, ny, nz, area };
+}
+function dist3(ax,ay,az,bx,by,bz) { return Math.hypot(ax-bx, ay-by, az-bz); }
+// quality = 4*sqrt(3)*Area / (edge0² + edge1² + edge2²) — 1 for an
+// equilateral triangle, -> 0 for increasingly skinny/degenerate ones.
+function triQuality(px,py,pz, qx,qy,qz, rx,ry,rz) {
+  const a = dist3(qx,qy,qz, rx,ry,rz), b = dist3(px,py,pz, rx,ry,rz), c = dist3(px,py,pz, qx,qy,qz);
+  const s = (a+b+c) * 0.5;
+  const areaSq = s*(s-a)*(s-b)*(s-c);
+  const area = areaSq > 0 ? Math.sqrt(areaSq) : 0;
+  const denom = a*a+b*b+c*c;
+  const maxEdge = Math.max(a,b,c), minEdge = Math.max(1e-12, Math.min(a,b,c));
+  return { quality: denom > 1e-12 ? (4*Math.sqrt(3)*area)/denom : 0, area, aspect: maxEdge/minEdge };
+}
+
+// A small binary min-heap of {cost, v1, v2} candidate edge collapses.
+class CollapseHeap {
+  constructor() { this.a = []; }
+  get size() { return this.a.length; }
+  push(item) {
+    const a = this.a; a.push(item);
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p].cost <= a[i].cost) break;
+      const t = a[p]; a[p] = a[i]; a[i] = t; i = p;
+    }
+  }
+  pop() {
+    const a = this.a;
+    if (a.length === 0) return undefined;
+    const top = a[0], last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2*i+1, r = 2*i+2; let m = i;
+        if (l < a.length && a[l].cost < a[m].cost) m = l;
+        if (r < a.length && a[r].cost < a[m].cost) m = r;
+        if (m === i) break;
+        const t = a[m]; a[m] = a[i]; a[i] = t; i = m;
+      }
+    }
+    return top;
+  }
+}
+
+// Build a normal indexed grid triangulation: (res+1)x(res+1) shared
+// vertices, 2 triangles per cell, winding matching the rest of the file
+// (upward-facing normals, same convention as the unmerged-cell case
+// below). Vertex index = j*(res+1)+i, same convention as the heightfield
+// array itself, so it lines up 1:1 with `heights`.
+function buildIndexedGridMesh(gx, gz, heights, res) {
+  const nV = (res + 1) * (res + 1);
+  const verts = new Float64Array(nV * 3);
+  const boundary = new Uint8Array(nV);
+  for (let j = 0; j <= res; j++) {
+    for (let i = 0; i <= res; i++) {
+      const vi = j * (res + 1) + i;
+      verts[vi*3] = gx[i]; verts[vi*3+1] = heights[vi]; verts[vi*3+2] = gz[j];
+      if (i === 0 || i === res || j === 0 || j === res) boundary[vi] = 1;
+    }
+  }
+  const tris = [];
+  for (let j = 0; j < res; j++) {
+    for (let i = 0; i < res; i++) {
+      const v00 = j*(res+1)+i, v10 = j*(res+1)+i+1, v01 = (j+1)*(res+1)+i, v11 = (j+1)*(res+1)+i+1;
+      tris.push([v00, v01, v10]);
+      tris.push([v10, v01, v11]);
+    }
+  }
+  return { verts, boundary, tris };
+}
+
+// Constrained iterative-edge-collapse QEM simplifier. `verts`/`tris`/
+// `boundary` come from buildIndexedGridMesh(); `step` is the grid's
+// world-space cell size (used only to sanity-bound the solved collapse
+// position); `targetTriCount`/`maxError` bound the simplification —
+// whichever is hit first stops the process (see the success-criteria
+// discussion in the accompanying design notes). Returns { verts, tris }:
+// `verts` are the (possibly relocated, boundary-frozen) final positions
+// and `tris` is the surviving triangle list, ready to hand to emitTri().
+function simplifyMeshQEM(verts, tris, boundary, step, targetTriCount, maxError) {
+  const nV = boundary.length;
+  const vertAlive = new Uint8Array(nV).fill(1);
+  const vertTris = Array.from({length: nV}, () => new Set());
+  const vertNeighbors = Array.from({length: nV}, () => new Set());
+  const triAlive = new Uint8Array(tris.length).fill(1);
+  const triVerts = tris.map(t => t.slice());
+
+  const P = (vi) => [verts[vi*3], verts[vi*3+1], verts[vi*3+2]];
+
+  for (let t = 0; t < triVerts.length; t++) {
+    const [a,b,c] = triVerts[t];
+    vertTris[a].add(t); vertTris[b].add(t); vertTris[c].add(t);
+    vertNeighbors[a].add(b); vertNeighbors[a].add(c);
+    vertNeighbors[b].add(a); vertNeighbors[b].add(c);
+    vertNeighbors[c].add(a); vertNeighbors[c].add(b);
+  }
+
+  // Per-vertex quadric Qv = sum of the plane quadrics K = p*p^T of every
+  // incident triangle's plane, p = [a,b,c,d]^T (Garland-Heckbert §3.1).
+  const vertQuadric = Array.from({length: nV}, () => new Float64Array(10));
+  function triPlaneQuadric(t) {
+    const [a,b,c] = triVerts[t];
+    const [px,py,pz] = P(a), [qx,qy,qz] = P(b), [rx,ry,rz] = P(c);
+    const { nx, ny, nz } = triNormalArea(px,py,pz, qx,qy,qz, rx,ry,rz);
+    const d = -(nx*px + ny*py + nz*pz);
+    return quadricFromPlane(nx, ny, nz, d);
+  }
+  for (let t = 0; t < triVerts.length; t++) {
+    const K = triPlaneQuadric(t);
+    const [a,b,c] = triVerts[t];
+    quadricAddInPlace(vertQuadric[a], K);
+    quadricAddInPlace(vertQuadric[b], K);
+    quadricAddInPlace(vertQuadric[c], K);
+  }
+
+  const cellArea0 = (() => {
+    const [a,b,c] = triVerts[0];
+    const [px,py,pz]=P(a),[qx,qy,qz]=P(b),[rx,ry,rz]=P(c);
+    return triNormalArea(px,py,pz,qx,qy,qz,rx,ry,rz).area || 1e-6;
+  })();
+  const minTriArea = cellArea0 * QEM_MIN_AREA_FRACTION;
+  const angleEasy = QEM_ANGLE_EASY_DEG * Math.PI/180;
+  const angleProtect = QEM_ANGLE_PROTECT_DEG * Math.PI/180;
+  const maxDisplacement = step * QEM_MAX_DISPLACEMENT_STEPS;
+
+  // Evaluate a candidate collapse of edge (v1,v2): builds the combined
+  // quadric, solves for the optimal position (§3 of the design notes),
+  // then tests every triangle-quality / normal-flip / manifold / feature-
+  // angle constraint (§4-§6) before accepting it. Returns null to reject,
+  // else {cost, qemError, x, y, z, removedTris}.
+  function evaluateEdge(v1, v2) {
+    if (!vertAlive[v1] || !vertAlive[v2]) return null;
+    if (boundary[v1] || boundary[v2]) return null; // border vertices are never collapsed — neighboring chunks depend on their exact positions
+    if (!vertNeighbors[v1].has(v2)) return null;
+
+    // Triangle(s) incident to this edge, and their opposite "apex" vertices.
+    const removedTris = [];
+    const apexes = [];
+    for (const t of vertTris[v1]) {
+      if (!triAlive[t]) continue;
+      const tv = triVerts[t];
+      if (tv.includes(v2)) {
+        removedTris.push(t);
+        for (const x of tv) if (x !== v1 && x !== v2) apexes.push(x);
+      }
+    }
+    if (removedTris.length === 0 || removedTris.length > 2) return null;
+
+    // Link condition: the two vertex neighborhoods must share exactly the
+    // apex vertices, or collapsing would create non-manifold topology.
+    let sharedCount = 0;
+    for (const w of vertNeighbors[v1]) if (vertNeighbors[v2].has(w)) sharedCount++;
+    if (sharedCount !== apexes.length) return null;
+
+    // Dihedral angle between the (up to 2) triangles being removed —
+    // decides whether this looks like a ridge/valley feature worth protecting.
+    let angle = 0, hasAngle = false;
+    if (removedTris.length === 2) {
+      const t0 = removedTris[0], t1 = removedTris[1];
+      const [a0,b0,c0] = triVerts[t0]; const [p0,q0,r0] = [P(a0), P(b0), P(c0)];
+      const [a1,b1,c1] = triVerts[t1]; const [p1,q1,r1] = [P(a1), P(b1), P(c1)];
+      const n0 = triNormalArea(...p0, ...q0, ...r0);
+      const n1 = triNormalArea(...p1, ...q1, ...r1);
+      const dot = Math.max(-1, Math.min(1, n0.nx*n1.nx + n0.ny*n1.ny + n0.nz*n1.nz));
+      angle = Math.acos(dot);
+      hasAngle = true;
+    }
+
+    // Combined quadric Q = Qv1 + Qv2, and its minimizing position v.
+    const Q = quadricAdd(vertQuadric[v1], vertQuadric[v2]);
+    const [x1,y1,z1] = P(v1), [x2,y2,z2] = P(v2);
+    const midx=(x1+x2)/2, midy=(y1+y2)/2, midz=(z1+z2)/2;
+    const candidates = [ { x:x1,y:y1,z:z1 }, { x:x2,y:y2,z:z2 }, { x:midx,y:midy,z:midz } ];
+    const solved = quadricOptimalPosition(Q);
+    if (solved && dist3(solved.x,solved.y,solved.z, midx,midy,midz) <= maxDisplacement) candidates.push(solved);
+    let best = null, bestErr = Infinity;
+    for (const cand of candidates) {
+      const e = Math.max(0, quadricError(Q, cand.x, cand.y, cand.z));
+      if (e < bestErr) { bestErr = e; best = cand; }
+    }
+    const qemError = bestErr;
+    const px = best.x, py = best.y, pz = best.z;
+
+    // Strong-feature protection: above the protect-angle threshold, only
+    // allow the collapse if the resulting geometric error is negligible.
+    if (hasAngle && angle > angleProtect && qemError > QEM_ANGLE_TINY_ERROR) return null;
+
+    // Test every triangle affected by the collapse (excluding the ones
+    // being removed) for degeneracy, normal flips, and poor quality.
+    let worstQuality = 1;
+    const affected = new Set();
+    for (const t of vertTris[v1]) if (triAlive[t] && !removedTris.includes(t)) affected.add(t);
+    for (const t of vertTris[v2]) if (triAlive[t] && !removedTris.includes(t)) affected.add(t);
+
+    for (const t of affected) {
+      const tv = triVerts[t];
+      const oldP = tv.map(vi => P(vi));
+      const newP = tv.map(vi => (vi === v1 || vi === v2) ? [px,py,pz] : P(vi));
+      const oldN = triNormalArea(...oldP[0], ...oldP[1], ...oldP[2]);
+      const newN = triNormalArea(...newP[0], ...newP[1], ...newP[2]);
+      if (newN.area < minTriArea) return null;                  // zero/extremely-small area
+      if (oldN.nx*newN.nx + oldN.ny*newN.ny + oldN.nz*newN.nz < 0) return null; // flipped normal
+      const q = triQuality(...newP[0], ...newP[1], ...newP[2]);
+      if (q.quality < QEM_MIN_QUALITY_HARD) return null;         // unacceptably skinny/degenerate
+      if (q.aspect > QEM_MAX_ASPECT_RATIO) return null;          // aspect-ratio spike (no triangle-fan/starburst shapes)
+      worstQuality = Math.min(worstQuality, q.quality);
+    }
+
+    // Soft cost penalties: totalCost = qemError * qualityPenalty *
+    // anglePenalty — a low QEM error alone can never buy an elongated
+    // triangle or a cross-feature collapse a top spot in the queue.
+    let qualityPenalty = 1;
+    if (worstQuality < QEM_QUALITY_SOFT_TARGET) qualityPenalty += QEM_QUALITY_PENALTY_K * (QEM_QUALITY_SOFT_TARGET - worstQuality);
+    let anglePenalty = 1;
+    if (hasAngle && angle > angleEasy) {
+      const t = Math.min(1, (angle - angleEasy) / Math.max(1e-6, angleProtect - angleEasy));
+      anglePenalty += 8 * t;
+    }
+    const cost = qemError * qualityPenalty * anglePenalty + 1e-12;
+    return { cost, qemError, x: px, y: py, z: pz, removedTris };
+  }
+
+  // Seed the heap with every valid interior-interior edge.
+  const heap = new CollapseHeap();
+  const seen = new Set();
+  for (let v1 = 0; v1 < nV; v1++) {
+    if (boundary[v1]) continue;
+    for (const v2 of vertNeighbors[v1]) {
+      if (v2 < v1) continue;
+      const key = v1 + '_' + v2;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const ev = evaluateEdge(v1, v2);
+      if (ev) heap.push({ cost: ev.cost, v1, v2 });
+    }
+  }
+
+  let aliveTriCount = triVerts.length;
+
+  while (aliveTriCount > targetTriCount && heap.size > 0) {
+    const item = heap.pop();
+    const ev = evaluateEdge(item.v1, item.v2);
+    if (!ev) continue; // edge no longer valid — its local neighborhood changed since it was queued
+    if (Math.abs(ev.cost - item.cost) > 1e-9 * Math.max(1, item.cost)) {
+      heap.push({ cost: ev.cost, v1: item.v1, v2: item.v2 }); // stale entry — re-queue with the freshly recomputed cost
+      continue;
+    }
+    if (ev.qemError > maxError) break; // error-bounded stop: the cheapest remaining valid collapse already exceeds the budget
+
+    // Commit: keep v1 (relocated to the QEM-optimal position), kill v2.
+    const v1 = item.v1, v2 = item.v2;
+    verts[v1*3] = ev.x; verts[v1*3+1] = ev.y; verts[v1*3+2] = ev.z;
+    quadricAddInPlace(vertQuadric[v1], vertQuadric[v2]);
+
+    for (const t of ev.removedTris) {
+      triAlive[t] = 0;
+      for (const vi of triVerts[t]) vertTris[vi].delete(t);
+      aliveTriCount--;
+    }
+    for (const t of Array.from(vertTris[v2])) {
+      if (!triAlive[t]) continue;
+      const tv = triVerts[t];
+      for (let k = 0; k < 3; k++) if (tv[k] === v2) tv[k] = v1;
+      vertTris[v1].add(t);
+    }
+    for (const w of vertNeighbors[v2]) {
+      if (w === v1) continue;
+      vertNeighbors[w].delete(v2);
+      vertNeighbors[w].add(v1);
+      vertNeighbors[v1].add(w);
+    }
+    vertNeighbors[v1].delete(v2);
+    vertAlive[v2] = 0;
+
+    // Recalculate collapse costs only for edges touching the surviving
+    // vertex — its local neighborhood is the only thing that changed.
+    for (const w of vertNeighbors[v1]) {
+      if (boundary[w]) continue;
+      const ev2 = evaluateEdge(v1, w);
+      if (ev2) heap.push({ cost: ev2.cost, v1, v2: w });
+    }
+  }
+
+  const finalTris = [];
+  for (let t = 0; t < triVerts.length; t++) if (triAlive[t]) finalTris.push(triVerts[t]);
+  return { verts, tris: finalTris };
+}
+
+// ---------------------------------------------------------------------
+// Chunk mesh construction: heightfield grid -> QEM simplification -> geometry
+// ---------------------------------------------------------------------
+function buildChunk(level, cx, cz) {
+  const size = chunkWorldSize(level);
+  const res = RES;
+  const step = size / res;
+  const ox = cx * size, oz = cz * size;
+
+  // Canonical per-axis world-coordinate tables. EVERY vertex built anywhere
+  // in this chunk — main terrain or skirt, merged or unmerged, interior or
+  // border cell — reads its x/z from these two arrays (gx[i], gz[j])
+  // instead of re-evaluating "ox + i*step" / "oz + j*step" inline at each
+  // call site. "ox + i*step" is deterministic for a given i, so in theory
+  // every call site that writes it out longhand already agrees — but that
+  // makes it easy for a future edit (or a call site that reassembles the
+  // same point a different way, e.g. via x1/z1 versus i0+w) to silently
+  // diverge by an ULP, and for a NON-INDEXED mesh an ULP of disagreement
+  // between two triangles that are supposed to share an edge is exactly
+  // what a rasterizer will render as a hairline background-colored crack.
+  // Routing every x/z through one shared array makes that class of bug
+  // impossible by construction: two triangles that reference gx[5] are
+  // reading the literal same float, not two independently-computed
+  // approximations of it.
+  const gx = new Float64Array(res + 1);
+  const gz = new Float64Array(res + 1);
+  for (let i = 0; i <= res; i++) gx[i] = ox + i * step;
+  for (let j = 0; j <= res; j++) gz[j] = oz + j * step;
+
+  // Sample the heightfield once for the whole chunk.
+  const heights = new Float32Array((res + 1) * (res + 1));
+  for (let j = 0; j <= res; j++) {
+    for (let i = 0; i <= res; i++) {
+      heights[j * (res + 1) + i] = terrainHeight(gx[i], gz[j]);
+    }
+  }
+  const h = (i, j) => heights[j * (res + 1) + i];
+  const vtx = (i, j) => [gx[i], h(i, j), gz[j]]; // the ONE place a grid-sample vertex is assembled
+
+  // --- Build a normal indexed triangle mesh, then decimate it with the
+  // constrained QEM edge-collapse simplifier (see simplifyMeshQEM above)
+  // instead of the old axis-aligned rectangle-merge. Chunk-border
+  // vertices are frozen by simplifyMeshQEM itself, so — exactly as with
+  // the old border-tessellation rule — two same-level chunks sampling
+  // identical world-space heights along their shared border always line
+  // up vertex-for-vertex; only interior vertices can move/collapse. ---
+  const initialMesh = buildIndexedGridMesh(gx, gz, heights, res);
+  const qemTarget = qemTargetTriCount(level, initialMesh.tris.length);
+  const qemMaxError = QEM_MAX_ERROR_BASE * Math.pow(4, level);
+  const simplified = simplifyMeshQEM(initialMesh.verts, initialMesh.tris, initialMesh.boundary, step, qemTarget, qemMaxError);
+  const simVerts = simplified.verts;
+  const simTris = simplified.tris;
+  function simVtx(vi) { return [simVerts[vi*3], simVerts[vi*3+1], simVerts[vi*3+2]]; }
+
+  // --- Emit geometry (non-indexed: simplest correct code for a "basics" pass) ---
+  const mainPos = [], mainNorm = [], mainCol = [], mainBary = [];
+  // Distance haze fades shading toward white across the CURRENTLY SELECTED
+  // view-distance range — but capped well short of 1.0. LOD levels are
+  // exponential in world-space distance, so most of what's actually on
+  // screen (by area) sits at high `level` values close to viewLevel-1; if
+  // this fully washed out to flat white there, nearly everything visible
+  // would lose all shading contrast and merged triangles would become
+  // indistinguishable from their neighbors — a "massive white block." The
+  // actual fade-to-black-sky at the true horizon is fog's job (see below);
+  // this is just atmospheric haze and should never erase relief entirely.
+  const levelFactor = Math.min(level / Math.max(viewLevel - 1, 1), 1);
+  const haze = levelFactor * 0.45;
+
+  // Per-vertex barycentric coordinates (1,0,0)/(0,1,0)/(0,0,1) for the 3
+  // corners of a triangle. Every triangle here is already emitted as its
+  // own private 3 vertices (non-indexed), so this costs nothing extra to
+  // set up — it just labels which corner is which. The wireframe shader
+  // (see terrainMaterial/skirtMaterial below) uses it to draw a constant
+  // screen-space-width line along every triangle edge.
+  const BARY = [[1,0,0],[0,1,0],[0,0,1]];
+
+  function emitTri(arr_p, arr_n, arr_c, arr_b, a, b, c) {
+    const abx = b[0]-a[0], aby = b[1]-a[1], abz = b[2]-a[2];
+    const acx = c[0]-a[0], acy = c[1]-a[1], acz = c[2]-a[2];
+    let nx = aby*acz - abz*acy;
+    let ny = abz*acx - abx*acz;
+    let nz = abx*acy - aby*acx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    // Direction-neutral faceted brightness -------------------------------
+    // dot(normal, LIGHT_DIR) — even unclamped — still keys brightness off
+    // alignment with ONE fixed world-space compass direction. Slopes whose
+    // normals happen to sit near that azimuth get strong light/dark
+    // separation; slopes roughly perpendicular to it all collapse toward
+    // the same mid-range dot value and lose contrast. Which of those two
+    // situations dominates the view depends on which patch of terrain the
+    // camera is currently pointed at — that's why turning around changed
+    // apparent contrast so much, even though LIGHT_DIR itself never moves.
+    // Rescaling the dot range differently (as the previous pass did)
+    // cannot fix this: the underlying single-azimuth bias is unchanged.
+    //
+    // Fix: derive brightness only from normal components that don't
+    // privilege one compass direction over another:
+    //   slope = ny            -- 1 for a flat top, 0 for a vertical face;
+    //                             the same value for a given steepness
+    //                             regardless of which way it's turned
+    //                             horizontally.
+    //   facet = |nx| + |nz|   -- horizontal tilt magnitude, treated
+    //                             symmetrically across all four compass
+    //                             quadrants (north/south/east/west-facing
+    //                             slopes of the same steepness get the same
+    //                             base value), instead of favoring whichever
+    //                             quadrant LIGHT_DIR pointed into.
+    // Two neighboring triangles still get two different brightnesses
+    // whenever their normals differ (facets stay readable), but nothing in
+    // the formula depends on alignment with a single fixed world direction,
+    // so overall contrast no longer swings with viewing direction.
+    let bright = 0.30 + ny * 0.55 + (Math.abs(nx) + Math.abs(nz)) * 0.30;
+    bright = Math.max(0.12, Math.min(1, bright));
+    bright = bright * (1 - haze) + 1.0 * haze; // atmospheric haze, capped — never fully flattens contrast
+    let vi = 0;
+    for (const p of [a, b, c]) {
+      arr_p.push(p[0], p[1], p[2]);
+      arr_n.push(nx, ny, nz);
+      // Mined-depth redness: hardness% (0 at a column's natural surface,
+      // +1%/layer dug below it — see the terrain-edit system near the top
+      // of the file) tints the vertex red. Pure function of (x,z), so
+      // it's cheap to re-derive per vertex here regardless of whether this
+      // vertex is an original grid sample or a QEM-solved position.
+      const hardness = terrainHardness(p[0], p[1], p[2]);
+      const red = Math.min(1, hardness / 100);
+      arr_c.push(bright * (1 - red) + red, bright * (1 - red * 0.85), bright * (1 - red * 0.85));
+      arr_b.push(BARY[vi][0], BARY[vi][1], BARY[vi][2]);
+      vi++;
+    }
+  }
+
+  // Every surviving triangle after QEM simplification is a genuine,
+  // already-indexed triangle sharing exact vertex positions with its
+  // neighbors (unlike the old rectangle-fan reconstruction), so emitting
+  // it is a direct 1:1 pass — no fan/perimeter reconstruction needed.
+  for (const [a, b, c] of simTris) {
+    emitTri(mainPos, mainNorm, mainCol, mainBary, simVtx(a), simVtx(b), simVtx(c));
+  }
+
+  // --- Skirts: cheap vertical curtains at chunk borders to hide LOD seam cracks ---
+  const skirtPos = [], skirtNorm = [], skirtCol = [], skirtBary = [];
+  const skirtDepth = SKIRT_DEPTH_BASE * Math.pow(2, level);
+  function addSkirtEdge(getPt) {
+    let prev = getPt(0);
+    for (let k = 1; k <= res; k++) {
+      const cur = getPt(k);
+      const prevLow = [prev[0], prev[1]-skirtDepth, prev[2]];
+      const curLow  = [cur[0],  cur[1]-skirtDepth,  cur[2]];
+      emitTri(skirtPos, skirtNorm, skirtCol, skirtBary, prev, prevLow, cur);
+      emitTri(skirtPos, skirtNorm, skirtCol, skirtBary, cur, prevLow, curLow);
+      prev = cur;
+    }
+  }
+  addSkirtEdge(k => vtx(k, 0));      // north
+  addSkirtEdge(k => vtx(k, res));    // south
+  addSkirtEdge(k => vtx(0, k));      // west
+  addSkirtEdge(k => vtx(res, k));    // east
+
+  const mainGeo = new THREE.BufferGeometry();
+  mainGeo.setAttribute('position', new THREE.Float32BufferAttribute(mainPos, 3));
+  mainGeo.setAttribute('normal', new THREE.Float32BufferAttribute(mainNorm, 3));
+  mainGeo.setAttribute('color', new THREE.Float32BufferAttribute(mainCol, 3));
+  mainGeo.setAttribute('barycentric', new THREE.Float32BufferAttribute(mainBary, 3));
+  mainGeo.computeBoundingSphere();
+
+  const skirtGeo = new THREE.BufferGeometry();
+  skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(skirtPos, 3));
+  skirtGeo.setAttribute('normal', new THREE.Float32BufferAttribute(skirtNorm, 3));
+  skirtGeo.setAttribute('color', new THREE.Float32BufferAttribute(skirtCol, 3));
+  skirtGeo.setAttribute('barycentric', new THREE.Float32BufferAttribute(skirtBary, 3));
+  skirtGeo.computeBoundingSphere();
+
+  return { mainGeo, skirtGeo, triCount: (mainPos.length + skirtPos.length) / 9, mainVertCount: mainPos.length / 3 };
+}
+
+// ---------------------------------------------------------------------
+// Scene / renderer / camera setup
+// ---------------------------------------------------------------------
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x000000, 500, 2000); // updated by setViewLevel()
+
+// --- Renderer creation, with a compatibility fallback for lower-end / ---
+// --- integrated GPUs (e.g. Chromebooks) that can choke on forced      ---
+// --- high-performance context requests combined with MSAA.           ---
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: false });
+} catch (e) {
+  console.warn('High-performance WebGL context failed, retrying with compatibility settings:', e);
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default', failIfMajorPerformanceCaveat: false });
+  } catch (e2) {
+    document.body.innerHTML = '<div style="color:#eee;font-family:sans-serif;padding:40px;max-width:600px">This device/browser could not create a WebGL context, so The Horizon can\'t run here. Try enabling hardware acceleration in your browser settings, or a different device.</div>';
+    throw e2;
+  }
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.autoClear = false; // we manage clear manually for reverse-Z (clear depth = 0)
+document.body.appendChild(renderer.domElement);
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  console.warn('WebGL context lost.');
+});
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 1, 1e9);
+const NEAR = 1;
+
+// --- Custom infinite far-plane, reverse-Z projection matrix ---
+// Reverse-Z: near maps to NDC/depth = 1, far (infinity) maps to depth = 0.
+// Requires depthFunc = GREATER and a depth buffer cleared to 0 (see animate()).
+//
+// Derivation (view-space z is negative in front of the camera; w=1):
+//   clip.z = A*z + B      clip.w = -z  (= distance, positive)
+//   ndc.z  = clip.z/clip.w = -A + B/distance
+// Solving for ndc=+1 at distance=NEAR and ndc=-1 as distance->infinity:
+//   A = 1, B = 2*NEAR
+// This spans the FULL [-1,1] NDC range (-> full [0,1] window depth range),
+// which is important for depth precision on GPUs with only 16-bit depth
+// buffers (integrated/low-power GPUs, some Chromebooks). An earlier version
+// of this matrix used A=0,B=NEAR, which only spans NDC (0,1] — half the
+// depth buffer wasted — and caused severe z-fighting on such hardware.
+function updateProjectionMatrix() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const fovRad = THREE.MathUtils.degToRad(75);
+  const f = 1 / Math.tan(fovRad / 2);
+  const te = camera.projectionMatrix.elements;
+  te[0]=f/aspect; te[1]=0;   te[2]=0;   te[3]=0;
+  te[4]=0;        te[5]=f;   te[6]=0;   te[7]=0;
+  te[8]=0;        te[9]=0;   te[10]=1;  te[11]=-1;
+  te[12]=0;       te[13]=0;  te[14]=2*NEAR; te[15]=0;
+  camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+}
+updateProjectionMatrix();
+
+// ---------------------------------------------------------------------
+// Triangle-edge wireframe overlay
+// ---------------------------------------------------------------------
+// The low-poly faces kept blending into each other because there was
+// nothing marking where one triangle stops and the next starts. Rather
+// than a separate wireframe Mesh/LineSegments pass (double the draw calls,
+// and gl.lineWidth is capped at 1px by most desktop GL drivers regardless
+// of what you ask for), this patches the existing MeshBasicMaterial's
+// generated shader (via onBeforeCompile) to draw an edge line directly in
+// the fragment shader, using each triangle's barycentric coordinates
+// (see the `barycentric` attribute added in buildChunk/emitTri above).
+// `fwidth(vBarycentric)` gives the per-fragment rate of change of the
+// barycentric coordinates in screen space, so thresholding against
+// `fwidth * widthPx` produces a line of the same *pixel* width no matter
+// how large, small, near, or far the triangle is — unlike gl.lineWidth.
+const WIREFRAME_LINE_WIDTH_PX = 1;
+const WIREFRAME_COLOR = new THREE.Color(0x000000);
+// The constant-screen-pixel-width trick (fwidth(vBarycentric) * widthPx)
+// is exactly what makes distant LOD triangles read cleanly — but it means
+// the SAME 2px is being measured against wildly different world-space
+// triangle sizes. Ordinary/far chunks are big enough that 2px is a thin
+// sliver of any triangle at any distance. The fine near-field patches
+// (DENS_STEP-sized triangles, only ever within NEAR_FIELD_RADIUS of the
+// player) are tiny in world space, so mid-range — no longer big enough
+// on screen to dwarf a 2px line, but not yet handed off to a coarser LOD
+// either — the same 2px line eats enough of a small triangle to read as
+// solid black. That's a band, not a one-sided falloff: right next to the
+// player those same triangles are large enough on screen that full
+// thickness is fine, and past the far edge of the near-field square
+// they're not this mesh's triangles anymore, so full thickness is
+// correct there too. The fix is a dip — full strength, thinned in the
+// middle band, full strength again — not a fade that keeps going.
+const WIREFRAME_FADE_NEAR = 4;    // world units — full-strength outline at/inside this distance
+const WIREFRAME_FADE_MID = 128;    // world units — thinnest point of the dip (midpoint of the band)
+const WIREFRAME_FADE_FAR = 192;    // world units — back to full-strength outline at/beyond this distance
+const WIREFRAME_FADE_MIN_SCALE = 0.25; // effective line-width multiplier at WIREFRAME_FADE_MID
+
+function addTriangleWireframeOverlay(material) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uLineWidthPx = { value: WIREFRAME_LINE_WIDTH_PX };
+    shader.uniforms.uPixelRatio = { value: renderer.getPixelRatio() };
+    shader.uniforms.uLineColor = { value: WIREFRAME_COLOR };
+    shader.uniforms.uFadeNear = { value: WIREFRAME_FADE_NEAR };
+    shader.uniforms.uFadeMid = { value: WIREFRAME_FADE_MID };
+    shader.uniforms.uFadeFar = { value: WIREFRAME_FADE_FAR };
+    shader.uniforms.uFadeMinScale = { value: WIREFRAME_FADE_MIN_SCALE };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec3 barycentric;\nvarying vec3 vBarycentric;\nvarying float vCamDist;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBarycentric = barycentric;')
+      // mvPosition isn't reliably available yet this early in every
+      // material's vertex shader, so compute camera-space distance
+      // directly rather than depend on it — same value project_vertex
+      // would use a moment later.
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvCamDist = -mvPosition.z;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vBarycentric;\nvarying float vCamDist;\nuniform float uLineWidthPx;\nuniform float uPixelRatio;\nuniform vec3 uLineColor;\nuniform float uFadeNear;\nuniform float uFadeMid;\nuniform float uFadeFar;\nuniform float uFadeMinScale;')
+      // Injected just before fog is applied, so the overlaid edge lines
+      // fade with distance fog exactly like the terrain does, instead of
+      // staying stark black scratches out at the hazy horizon.
+      .replace('#include <fog_fragment>', `
+        {
+          // Ramp DOWN from full strength (near) to the thin point (mid),
+          // then ramp back UP to full strength (far) — a bounded dip,
+          // not a one-way fade, so chunks past uFadeFar are unaffected.
+          float distIn = smoothstep(uFadeNear, uFadeMid, vCamDist);
+          float distOut = smoothstep(uFadeMid, uFadeFar, vCamDist);
+          float widthScale = mix(mix(1.0, uFadeMinScale, distIn), 1.0, distOut);
+          vec3 d = fwidth(vBarycentric);
+          vec3 a3 = smoothstep(vec3(0.0), d * (uLineWidthPx * uPixelRatio * widthScale), vBarycentric);
+          float edgeFactor = min(min(a3.x, a3.y), a3.z);
+          gl_FragColor.rgb = mix(uLineColor, gl_FragColor.rgb, edgeFactor);
+        }
+        #include <fog_fragment>
+      `);
+  };
+  material.needsUpdate = true;
+}
+
+const terrainMaterial = new THREE.MeshBasicMaterial({
+  vertexColors: true, fog: true, side: THREE.FrontSide, depthFunc: THREE.GreaterDepth
+});
+addTriangleWireframeOverlay(terrainMaterial);
+const skirtMaterial = new THREE.MeshBasicMaterial({
+  vertexColors: true, fog: true, side: THREE.DoubleSide, depthFunc: THREE.GreaterDepth
+});
+addTriangleWireframeOverlay(skirtMaterial);
+
+// =========================================================================
+// STAGE 2 — fine near-field terrain patches, generalized to the WHOLE
+// WORLD (not one hardcoded chunk).
+// ---------------------------------------------------------------------
+// Stage 1 (kept in the design notes below for context) proved, on a single
+// hardcoded chunk, that a fine heightfield grid seeded from terrainHeight()
+// lines up with the surrounding buildChunk()/QEM mesh at shared chunk
+// borders via the existing skirt curtains, with no new blending logic.
+//
+// This stage generalizes that patch into buildFinePatchChunk(cx, cz),
+// callable for ANY level-0 chunk, and routes it through the SAME chunk
+// manager as ordinary terrain (chunkEntries/chunkCache/genQueue/
+// processQueue below) instead of a separate hand-rolled add/remove path.
+// That reuse is deliberate: the manager already gives us frustum culling,
+// generation spread across frames (CHUNKS_PER_FRAME), bounded LRU caching,
+// and mining invalidation for free — a parallel system would have to
+// reinvent all of that.
+//
+// The part that actually keeps this affordable at world scale is NOT a
+// merge/decimation trick — it's scope: only the handful of level-0 chunks
+// within NEAR_FIELD_RADIUS of the player (see neededSet() below) are ever
+// built at this finer resolution; every chunk beyond that, at every level,
+// still goes through the ordinary buildChunk()+QEM path completely
+// unchanged. Fine detail a player can't get close to buys nothing, so we
+// simply never pay for it. Always on, and always centered on the player —
+// it follows them anywhere in the (effectively infinite) world instead of
+// sitting at one fixed spot.
+// =========================================================================
+const NEAR_FIELD_RADIUS = 1; // level-0 chunk radius around the player built fine — small & bounded on purpose
+const VOL_VOXEL_SIZE_DEFAULT = DENS_STEP; // alias — see DENS_STEP's own definition near the top of the
+                                           // terrain-edits section for why this is one constant, not two.
+
+// Signed density (positive = solid, negative = air, zero at the live
+// surface) is now defined once, up in the TERRAIN EDITS v2 section near
+// the top of the file — see densityAt()/sampleDensity() there. Every
+// level-0/near-field chunk, mined or not, samples that SAME field below
+// via buildFinePatchChunk(); there's deliberately no separate
+// "bands-aware" density function anymore. The old two-tier version
+// (a plain heightfield density for ordinary ground, a second
+// bands-aware density for tunnel interiors, manually masked against
+// each other) is exactly what produced the z-fighting this rewrite set
+// out to fix — see the "WHY THIS ISN'T VOLUMETRIC SURFACE NETS ANYMORE"
+// note below, which predates this rewrite and is kept for history, plus
+// the new note after it explaining why that verdict has now flipped.
+
+// --- Naive Surface Nets: at most one vertex per cell the surface passes
+// through (averaged from where the density field crosses zero along that
+// cell's 12 edges), with quads stitched between the 4 cells sharing each
+// surface-crossing grid edge. Structurally incapable of emitting a cube
+// face — every primitive is a triangle pair between existing cell
+// vertices. ---
+const SN_CORNER = [
+  [0,0,0],[1,0,0],[1,1,0],[0,1,0],
+  [0,0,1],[1,0,1],[1,1,1],[0,1,1],
+];
+const SN_EDGES = [
+  [0,1],[1,2],[2,3],[3,0],
+  [4,5],[5,6],[6,7],[7,4],
+  [0,4],[1,5],[2,6],[3,7],
+];
+// `owned` restricts which EDGES this call is allowed to emit quads for,
+// by the edge's (i,k) grid-point coordinates (see call site for why i/k
+// and not j). Left undefined/omitted, every edge in range is fair game —
+// that's correct for a single self-contained volume. A caller that pads
+// its sample grid by one extra ghost layer on each side of i and k (to
+// borrow neighboring-chunk density values purely for ring completion —
+// see buildFinePatchChunk) passes {iLo,iHi,kLo,kHi} so this call only
+// emits the sub-range of edges it actually owns, leaving the ghost-only
+// edges (which the padding was never meant to publish) unemitted.
+function surfaceNets(nx, ny, nz, sample, owned) {
+  const iLo = owned ? owned.iLo : 0, iHi = owned ? owned.iHi : nx - 1;
+  const kLo = owned ? owned.kLo : 0, kHi = owned ? owned.kHi : nz - 1;
+  const at = (i, j, k) => i + nx * (j + ny * k);
+  const d = new Float32Array(nx * ny * nz);
+  for (let k = 0; k < nz; k++)
+    for (let j = 0; j < ny; j++)
+      for (let i = 0; i < nx; i++)
+        d[at(i, j, k)] = sample(i, j, k);
+
+  const cellAt = (i, j, k) => i + (nx - 1) * (j + (ny - 1) * k);
+  const cellVert = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1);
+  const positions = [];
+
+  for (let k = 0; k < nz - 1; k++) {
+    for (let j = 0; j < ny - 1; j++) {
+      for (let i = 0; i < nx - 1; i++) {
+        let inside = false, outside = false;
+        const cv = new Float32Array(8);
+        for (let c = 0; c < 8; c++) {
+          const [oi, oj, ok] = SN_CORNER[c];
+          const v = d[at(i + oi, j + oj, k + ok)];
+          cv[c] = v;
+          if (v >= 0) inside = true; else outside = true;
+        }
+        if (!(inside && outside)) continue; // uniform cell — no surface passes through it
+        let sx = 0, sy = 0, sz = 0, count = 0;
+        for (const [a, b] of SN_EDGES) {
+          const va = cv[a], vb = cv[b];
+          if ((va >= 0) === (vb >= 0)) continue; // no zero-crossing on this edge
+          const t = va / (va - vb);
+          const [ai, aj, ak] = SN_CORNER[a], [bi, bj, bk] = SN_CORNER[b];
+          sx += ai + (bi - ai) * t;
+          sy += aj + (bj - aj) * t;
+          sz += ak + (bk - ak) * t;
+          count++;
+        }
+        cellVert[cellAt(i, j, k)] = positions.length / 3;
+        positions.push(i + sx / count, j + sy / count, k + sz / count);
+      }
+    }
+  }
+
+  // Quads: for every grid EDGE (not cell) whose two endpoints straddle
+  // the surface, connect the (up to) 4 active cells that share that edge.
+  const quads = [];
+  function ring(i, j, k, axis) {
+    if (axis === 0) return [[i, j-1, k-1], [i, j, k-1], [i, j, k], [i, j-1, k]];
+    // BUG FIXED: axis 0 above uses pair (j,k) — the cyclically-consistent
+    // choice for an X-directed edge (cyclic order X→Y→Z, so X's edge uses
+    // the (Y,Z) pair) — and axis 2 below uses (i,j), the correct (X,Y)
+    // pair for a Z-directed edge (cyclic Z→X→Y). This axis-1 case used to
+    // use (i,k) for a Y-directed edge, but the cyclically-consistent pair
+    // for Y is (Z,X) = (k,i), not (i,k) — reusing the (i,k) order without
+    // swapping it flips the handedness for exactly this one axis. Verified
+    // directly: a synthetic flat-plane density field fed through this
+    // function produced correctly outward-facing normals on the X and Z
+    // axes but a reversed (inward-facing) normal on Y before this fix. In
+    // practice that meant every roof/floor face (the horizontal surfaces
+    // a Y-edge crossing produces) came out wound backwards — invisible
+    // against the FrontSide-only terrain material — while side walls
+    // (X/Z edges) rendered normally, which is exactly the "top and bottom
+    // missing, walls present" pattern reported. Reversing this cycle
+    // (equivalent to swapping to the correct (k,i) pair) fixes it.
+    if (axis === 1) return [[i-1, j, k], [i, j, k], [i, j, k-1], [i-1, j, k-1]];
+    return [[i-1, j-1, k], [i, j-1, k], [i, j, k], [i-1, j, k]];
+  }
+  for (let k = 0; k < nz; k++) {
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        for (let axis = 0; axis < 3; axis++) {
+          let ni = i, nj = j, nk = k;
+          if (axis === 0) ni++; else if (axis === 1) nj++; else nk++;
+          if (ni >= nx || nj >= ny || nk >= nz) continue;
+          // Ownership check (see `owned` doc above): i and k are an edge's
+          // ring-defining coordinates for EVERY axis — the along-axis one
+          // for the axis they direct, the fixed one for the other two —
+          // so gating both against the same [lo,hi] window is sufficient
+          // for all three axes; j is never boundary-sensitive and is left
+          // unrestricted.
+          if (i < iLo || i > iHi || k < kLo || k > kHi) continue;
+          const here = d[at(i, j, k)], there = d[at(ni, nj, nk)];
+          const hereIn = here >= 0;
+          if (hereIn === (there >= 0)) continue; // no crossing on this edge
+          const cells = ring(i, j, k, axis);
+          let ok = true;
+          const idx = [];
+          for (const [ci, cj, ck] of cells) {
+            if (ci < 0 || cj < 0 || ck < 0 || ci >= nx - 1 || cj >= ny - 1 || ck >= nz - 1) { ok = false; break; }
+            const vi = cellVert[cellAt(ci, cj, ck)];
+            if (vi < 0) { ok = false; break; } // shouldn't happen for a consistent field, but don't emit a degenerate quad if it does
+            idx.push(vi);
+          }
+          if (!ok) continue;
+          // Winding flips with which side of the edge is "inside" so every
+          // quad faces outward (solid -> air) regardless of which corner
+          // happened to be sampled as the inside one.
+          quads.push(hereIn ? [idx[0], idx[1], idx[2], idx[3]] : [idx[0], idx[3], idx[2], idx[1]]);
+        }
+      }
+    }
+  }
+  return { positions, quads };
+}
+
+// Fine patches now share terrainMaterial (FrontSide) with ordinary chunks
+// — one fewer material/shader program alive at once, and the winding was
+// already validated correct during stage 1 (see the note below), so the
+// DoubleSide "did a quad come out backwards?" safety net a pure test
+// material needs is no longer earning its keep in the production path.
+
+// NOTE ON WHY THIS ISN'T VOLUMETRIC SURFACE NETS ANYMORE (HISTORICAL)
+// -----------------------------------------------------------------------
+// The first version of this patch ran a real 3D density grid
+// (sampleDensity = terrainHeight(x,z) - y) through naive Surface Nets.
+// That's structurally the wrong tool for a surface with no overhangs:
+// Surface Nets emits at most ONE vertex per voxel CELL, and which cell a
+// given column's crossing lands in is decided by the coarse voxel grid,
+// not by the true height. Two neighboring columns whose real heights
+// differ by less than one voxel get assigned to the SAME row (a flat
+// run); once enough slope accumulates to cross a voxel boundary, the
+// next column jumps to a different row, and the two rows are joined by
+// a near-vertical "riser" quad — that alternating flat/riser pattern is
+// the staircase.
+//
+// The fix at the time was to stop routing a heightfield through a
+// volumetric grid at all, and build ONE sloped quad per horizontal cell
+// with corners set directly to the real analytic heights instead — the
+// SAME idea as the ordinary heightfield chunks, just at a finer local
+// resolution. That worked for plain ground, but any column that had been
+// mined into an actual tunnel (roof + void + floor — more than one solid
+// span) has no representation at all in a per-column height grid, so a
+// SECOND system (Surface Nets over sampleDensityBands(), heavily masked
+// against the flat grid via cellOverTunnel()/tunnel boxes) had to run
+// alongside it just for those columns. Two independently triangulated
+// surfaces occupying the same space is exactly what read as flickering,
+// z-fighting geometry — the mask/padding logic that used to live here
+// was entirely about papering over that seam, not eliminating it.
+//
+// THE ACTUAL FIX NOW: go back to a single volumetric pass for the WHOLE
+// near-field chunk, mined or not — the staircase problem above is gone
+// because mining no longer needs "a second representation" at all: the
+// live density field (densityAt()/getBands(), near the top of the file)
+// IS the ground everywhere, plain terrain included, so there's only ever
+// one isosurface, extracted once, by one triangulator. The old staircase
+// bug was really about coarse VOXEL topology fighting a SMOOTH analytic
+// height; that only becomes visible on unmined, plain-sloped ground —
+// and it's fully avoided here by treating the two cases identically
+// instead of routing them through different code paths: a completely
+// unmined chunk just so happens to have a perfectly smooth density field
+// (the analytic heightAt() surface with no edits), so Surface Nets draws
+// it exactly as smoothly as the old flat-quad path did. See
+// buildIndexedGridMesh()/buildChunk() for that same "smooth slope, sharp
+// feature" heightfield technique, still used unchanged by every chunk
+// OUTSIDE the near field.
+//
+// Generalized to take any (cx, cz) so it can be requested for whichever
+// level-0 chunks currently fall in the player's near field, or have been
+// mined regardless of distance — see NEAR_FIELD_RADIUS / neededSet()
+// below. Returns the same shape processQueue() already expects from a
+// normal chunk build: { mesh, triCount, mainVertCount }.
+function buildFinePatchChunk(cx, cz) {
+  const size = chunkWorldSize(0);
+  const ox = cx * size, oz = cz * size;
+  const step = DENS_STEP;
+  // size (64) divides evenly by DENS_STEP (2) by construction, so this
+  // grid's sample points land EXACTLY on chunk boundaries — n+1 samples
+  // running from this chunk's own origin to its far edge inclusive, the
+  // same tiling convention buildIndexedGridMesh() already uses for the
+  // ordinary heightfield chunks. Because densityAt() is a pure,
+  // deterministic function of world position, the neighbor chunk's own
+  // first/last sample column lands on the exact same world coordinate
+  // and therefore reads the exact same density value there — the two
+  // chunks' meshes share an edge by construction.
+  //
+  // That guarantees the two chunks AGREE on where the surface crosses
+  // the shared column — but Surface Nets still needs the full ring of
+  // cells around an edge to actually triangulate it, and a cell straddling
+  // the border belongs to neither chunk's own [0,n-1] cell range. Each
+  // side independently sees a broken ring at its outer boundary and
+  // silently drops those quads (see surfaceNets' `ok` check) — a seam of
+  // missing triangles exactly on every chunk border. Fixed by sampling
+  // ONE extra ghost column/row of density on every X/Z side (PAD) purely
+  // so boundary rings have real neighbor-side data to complete themselves
+  // with, while `owned` below still restricts each chunk to emitting only
+  // its own [0,n-1] edges — so neither side skips its border quads nor
+  // duplicates the neighbor's.
+  const PAD = 1;
+  const n = Math.round(size / step);
+  const gx = new Float64Array(n + 1 + 2 * PAD), gz = new Float64Array(n + 1 + 2 * PAD);
+  for (let i = 0; i < gx.length; i++) gx[i] = ox + (i - PAD) * step;
+  for (let k = 0; k < gz.length; k++) gz[k] = oz + (k - PAD) * step;
+
+  // Per-column natural height, sampled once and reused for both the
+  // vertical-range estimate below AND every density sample up/down that
+  // column (see densityAt()'s naturalY parameter) — heightAt() runs a
+  // 5-octave noise stack, so this is the difference between one noise
+  // evaluation per column and one per column PER VERTICAL SAMPLE. Covers
+  // the padded ghost columns too, since sample() below reads from the
+  // full padded grid.
+  const naturalYs = new Float64Array(gx.length * gz.length);
+  let naturalMinY = Infinity, naturalMaxY = -Infinity;
+  for (let k = 0; k < gz.length; k++) {
+    for (let i = 0; i < gx.length; i++) {
+      const h = heightAt(gx[i], gz[k]);
+      naturalYs[k * gx.length + i] = h;
+      if (h < naturalMinY) naturalMinY = h;
+      if (h > naturalMaxY) naturalMaxY = h;
+    }
+  }
+  const naturalYAt = (i, k) => naturalYs[k * gx.length + i];
+
+  // Vertical sampling range: a thin shell hugging this chunk's own
+  // natural relief by default (cheap — most chunks are never mined),
+  // widened to cover any density edit that landed in this chunk's own
+  // footprint OR spilled in from a neighbor near the border (a dig near
+  // a chunk edge can touch lattice points whichever side of the line
+  // they fall on) — see minedChunkBounds, maintained by completeMine().
+  const SHELL_PAD = step * 3;
+  let minY = naturalMinY - SHELL_PAD, maxY = naturalMaxY + SHELL_PAD;
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const b = minedChunkBounds.get((cx + dx) + ',' + (cz + dz));
+      if (!b) continue;
+      minY = Math.min(minY, b.minY - step * 2);
+      maxY = Math.max(maxY, b.maxY + step * 2);
+    }
+  }
+
+  // Auto-coarsen safety net: a steep or deeply-mined chunk can demand a
+  // tall sampling box, and naive Surface Nets scans every (i,j,k) in its
+  // domain regardless of where the surface actually is — nx*ny*nz grows
+  // fast with box height. Rather than let one unlucky chunk (a cliff
+  // face, or a shaft dug straight to bedrock) spike well past every
+  // other chunk's cost, coarsen the VERTICAL step only (X/Z stay locked
+  // to DENS_STEP, which is what keeps mining and mesh resolution/chunk
+  // seams exact) until the sample budget is met. This only ever fires
+  // on the rare tall chunk; ordinary chunks keep full resolution.
+  const SAMPLE_BUDGET = 70000;
+  // BUG FIXED (chunk-border holes, reproducible at chunk 0,0 even before
+  // any mining): X/Z sample points already land on the exact same world
+  // coordinate on both sides of a border (gx[i]/gz[k] above are pure
+  // multiples of `step` from the WORLD origin, not from this chunk's own
+  // origin-relative index), so neighboring chunks agree exactly there.
+  // But `minY` used to be `naturalMinY - SHELL_PAD` — this chunk's OWN
+  // natural min height, an arbitrary float that differs chunk to chunk —
+  // and `gy[j] = minY + j*yStep` was built directly from that arbitrary,
+  // per-chunk offset. Two neighboring chunks therefore sampled DIFFERENT
+  // sets of world-Y heights even along their shared border column, so
+  // Surface Nets (which places a vertex at the AVERAGE of a cell's edge
+  // crossings) landed that vertex at a slightly different Y on each side
+  // — a crack. Fix: snap the vertical box to a lattice anchored at world
+  // Y=0 (a multiple of Y_LATTICE, the largest step this auto-coarsen loop
+  // can ever pick) BEFORE deriving yStep/gy, so gy is always a subset of
+  // one single, chunk-independent global Y lattice — any two chunks'
+  // grids share their world-Y sample points exactly, same as X/Z already
+  // did, closing the seam.
+  const Y_LATTICE = step * 16; // == the largest possible yStep below; every smaller yStep in the
+                                // doubling sequence (step, 2*step, 4*step, 8*step, 16*step) divides
+                                // this evenly, so snapping to it keeps ANY chosen yStep aligned.
+  minY = Math.floor(minY / Y_LATTICE) * Y_LATTICE;
+  maxY = Math.ceil(maxY / Y_LATTICE) * Y_LATTICE;
+  let yStep = step;
+  let ny = Math.max(2, Math.round((maxY - minY) / yStep));
+  while (gx.length * gz.length * (ny + 1) > SAMPLE_BUDGET && yStep < step * 16) {
+    yStep *= 2;
+    ny = Math.max(2, Math.round((maxY - minY) / yStep));
+  }
+  const gy = new Float64Array(ny + 1);
+  for (let j = 0; j <= ny; j++) gy[j] = minY + j * yStep;
+
+  const sample = (i, j, k) => densityAt(gx[i], gy[j], gz[k], naturalYAt(i, k));
+  // Only edges with grid-point coords i,k in [PAD, PAD+n-1] are this
+  // chunk's own — i.e. its true [0,n-1] column/row range once the PAD
+  // offset is undone. The ghost columns/rows outside that (padded index
+  // 0 and index gx.length-1) exist purely to complete boundary rings and
+  // are never themselves an owned edge, so nothing gets double-emitted
+  // by the neighboring chunk performing the same padding on its side.
+  const owned = { iLo: PAD, iHi: PAD + n - 1, kLo: PAD, kHi: PAD + n - 1 };
+  const { positions: vpos, quads: vquads } = surfaceNets(gx.length, ny + 1, gz.length, sample, owned);
+
+  // vpos holds fractional GRID indices (e.g. 3.5 = halfway between grid
+  // points 3 and 4); since gx/gz/gy are each uniformly spaced, converting
+  // back to world space is a plain linear scale — no lookup needed. The
+  // PAD offset baked into gx/gz above (gx[i] = ox + (i-PAD)*step) already
+  // accounts for the ghost columns, so this stays a direct index*step
+  // scale from the grid's own origin (ox - PAD*step), same as before.
+  const toWorld = (idx) => [ox + (vpos[idx * 3] - PAD) * step, minY + vpos[idx * 3 + 1] * yStep, oz + (vpos[idx * 3 + 2] - PAD) * step];
+  // Per-vertex hardness (for the rock-redness color grading below) needs
+  // the NATURAL (unedited) height at that vertex's (x,z) — but calling
+  // heightAt() again here, once per triangle VERTEX, silently undid the
+  // whole point of the naturalYs precompute above: heightAt() is a
+  // 5-octave noise stack, naturalYs already paid for it exactly once per
+  // grid COLUMN, and a typical fine patch emits on the order of a couple
+  // thousand triangles — i.e. several thousand redundant 5-octave noise
+  // evaluations every single time this chunk (re)builds, which is exactly
+  // what runs synchronously on every mining swing that invalidates a
+  // near-field chunk. Surface Nets vertices sit at fractional grid
+  // positions (not exactly on a sampled column), so instead of calling
+  // heightAt() again, bilinearly interpolate the already-computed
+  // naturalYs samples at that same fractional (i,k) — visually
+  // indistinguishable for this cosmetic hardness gradient, and reuses
+  // work that's already paid for instead of redoing it.
+  const naturalYAtFrac = (fi, fk) => {
+    const i0 = Math.max(0, Math.min(gx.length - 1, Math.floor(fi)));
+    const k0 = Math.max(0, Math.min(gz.length - 1, Math.floor(fk)));
+    const i1 = Math.min(gx.length - 1, i0 + 1), k1 = Math.min(gz.length - 1, k0 + 1);
+    const tx = Math.min(1, Math.max(0, fi - i0)), tz = Math.min(1, Math.max(0, fk - k0));
+    const h00 = naturalYAt(i0, k0), h10 = naturalYAt(i1, k0);
+    const h01 = naturalYAt(i0, k1), h11 = naturalYAt(i1, k1);
+    return h00 * (1 - tx) * (1 - tz) + h10 * tx * (1 - tz) + h01 * (1 - tx) * tz + h11 * tx * tz;
+  };
+  const naturalYAtIdx = (idx) => naturalYAtFrac(vpos[idx * 3], vpos[idx * 3 + 2]);
+
+  const pos = [], nrm = [], col = [], bary = [];
+  const BARY = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const pushVolTri = (p0, p1, p2, ny0, ny1, ny2) => {
+    const ux = p1[0]-p0[0], uy = p1[1]-p0[1], uz = p1[2]-p0[2];
+    const vx = p2[0]-p0[0], vy = p2[1]-p0[1], vz = p2[2]-p0[2];
+    let nX = uy*vz - uz*vy, nY = uz*vx - ux*vz, nZ = ux*vy - uy*vx;
+    const len = Math.hypot(nX, nY, nZ) || 1;
+    nX /= len; nY /= len; nZ /= len;
+    // Same brightness/redness formula as the rest of the terrain (see
+    // emitTri()/pushVert() elsewhere) so a mined near-field chunk reads
+    // as visually consistent with ordinary ground and with itself
+    // whether you're looking at open ground or into a tunnel wall.
+    let bright = 0.30 + Math.abs(nY) * 0.55 + (Math.abs(nX) + Math.abs(nZ)) * 0.30;
+    bright = Math.max(0.12, Math.min(1, bright));
+    const NATURAL = [ny0, ny1, ny2];
+    for (let t = 0; t < 3; t++) {
+      const p = t === 0 ? p0 : t === 1 ? p1 : p2;
+      pos.push(p[0], p[1], p[2]);
+      nrm.push(nX, nY, nZ);
+      const hardness = hardnessAtY(NATURAL[t], p[1]);
+      const red = Math.min(1, hardness / 100);
+      col.push(bright*(1-red)+red, bright*(1-red*0.85), bright*(1-red*0.85));
+      bary.push(BARY[t][0], BARY[t][1], BARY[t][2]);
+    }
+  };
+  for (const q of vquads) {
+    const p0 = toWorld(q[0]), p1 = toWorld(q[1]), p2 = toWorld(q[2]), p3 = toWorld(q[3]);
+    const h0 = naturalYAtIdx(q[0]), h1 = naturalYAtIdx(q[1]), h2 = naturalYAtIdx(q[2]), h3 = naturalYAtIdx(q[3]);
+    pushVolTri(p0, p1, p2, h0, h1, h2);
+    pushVolTri(p0, p2, p3, h0, h2, h3);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nrm), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+  geo.setAttribute('barycentric', new THREE.BufferAttribute(new Float32Array(bary), 3));
+  geo.computeBoundingSphere();
+
+  // Shares terrainMaterial with ordinary chunks — no skirt geometry of
+  // its own, so every triangle is "main" for the mining raycaster
+  // (mainVertCount = all vertices).
+  const mesh = new THREE.Mesh(geo, terrainMaterial);
+  mesh.frustumCulled = true;
+  mesh.matrixAutoUpdate = false;
+  mesh.matrixWorldAutoUpdate = false;
+  mesh.name = 'finePatch';
+  const triCount = pos.length / 9;
+  return { mesh, triCount, mainVertCount: pos.length / 3 };
+}
+
+// ---------------------------------------------------------------------
+// Chunk manager: LOD ring selection, generation queue, retention, cache
+// ---------------------------------------------------------------------
+const chunkEntries = new Map();   // key -> { mesh, triCount, level, cx, cz } — currently IN the scene
+const pendingRemoval = new Set(); // keys in chunkEntries that are no longer needed, but kept
+                                   // visible as a fallback until every currently-queued
+                                   // replacement chunk has actually finished generating —
+                                   // this is what prevents the "hole while regenerating" bug.
+const chunkCache = new Map();     // key -> { mesh, triCount, level, cx, cz } — NOT in scene,
+                                   // geometry retained so walking back doesn't rebuild it.
+const CHUNK_CACHE_MAX = 96;       // bounded so memory can't grow without limit
+// Keys whose INSTALLED mesh is stale (a terrain edit landed inside its
+// footprint) but hasn't been rebuilt yet — see invalidateChunksAt() and
+// the "lag spike after a mining tick" note on processQueue() below.
+const dirtyChunks = new Set();
+let genQueue = [];
+let runningTriCount = 0;
+const CHUNKS_PER_FRAME = 2; // spread generation cost across frames
+
+function keyFor(level, cx, cz) { return level + '_' + cx + '_' + cz; }
+
+// Merge the main terrain geometry and the skirt geometry (from buildChunk,
+// unchanged) into a single non-indexed BufferGeometry with two material
+// groups, so a chunk is one Mesh/one scene-graph object instead of a Group
+// with two child Meshes — same seams, same triangles, less traversal/object
+// overhead. Disposes the two source geometries once merged.
+function mergeChunkGeometries(mainGeo, skirtGeo) {
+  const mp = mainGeo.attributes.position.array, mn = mainGeo.attributes.normal.array, mc = mainGeo.attributes.color.array, mb = mainGeo.attributes.barycentric.array;
+  const sp = skirtGeo.attributes.position.array, sn = skirtGeo.attributes.normal.array, sc = skirtGeo.attributes.color.array, sb = skirtGeo.attributes.barycentric.array;
+  const pos = new Float32Array(mp.length + sp.length); pos.set(mp, 0); pos.set(sp, mp.length);
+  const norm = new Float32Array(mn.length + sn.length); norm.set(mn, 0); norm.set(sn, mn.length);
+  const col = new Float32Array(mc.length + sc.length); col.set(mc, 0); col.set(sc, mc.length);
+  const bary = new Float32Array(mb.length + sb.length); bary.set(mb, 0); bary.set(sb, mb.length);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('barycentric', new THREE.BufferAttribute(bary, 3));
+  const mainCount = mp.length / 3, skirtCount = sp.length / 3;
+  geo.addGroup(0, mainCount, 0);              // material 0 = terrainMaterial (FrontSide)
+  geo.addGroup(mainCount, skirtCount, 1);      // material 1 = skirtMaterial (DoubleSide)
+  geo.computeBoundingSphere();
+  mainGeo.dispose();
+  skirtGeo.dispose();
+  return geo;
+}
+
+function disposeEntry(entry) { entry.mesh.geometry.dispose(); }
+
+// Bounded LRU-ish cache: re-inserting a key bumps it to "most recently used"
+// (Map iteration order), so eviction (when over CHUNK_CACHE_MAX) always
+// drops the least-recently-touched entry first.
+function cachePut(key, entry) {
+  if (chunkCache.has(key)) chunkCache.delete(key);
+  chunkCache.set(key, entry);
+  while (chunkCache.size > CHUNK_CACHE_MAX) {
+    const oldestKey = chunkCache.keys().next().value;
+    disposeEntry(chunkCache.get(oldestKey));
+    chunkCache.delete(oldestKey);
+  }
+}
+
+function neededSet(viewLevel, px, pz) {
+  const set = new Map();
+  // Running bounding box of everything already covered by finer levels
+  // (world-space, exact chunk-grid-aligned rect — NOT based on the raw
+  // continuous player position, since that's what caused the seam bug:
+  // a coarser chunk was being skipped whenever it was "close enough" to
+  // the player in a straight-line sense, but the finer level underneath
+  // it is quantized to its own chunk grid, which is out of phase with the
+  // player's continuous position by up to one chunk. That phase mismatch
+  // is exactly the intermittent one-chunk-wide hole — its side flips
+  // depending on which way that quantization currently leans as you move.
+  let covMinX = 0, covMaxX = 0, covMinZ = 0, covMaxZ = 0;
+  for (let level = 0; level < viewLevel; level++) {
+    const size = chunkWorldSize(level);
+    const ccx = Math.floor(px / size), ccz = Math.floor(pz / size);
+    // Fine near-field patches only ever apply at level 0 (finest LOD ring)
+    // and only within a small, fixed radius of the player's CURRENT chunk
+    // — capped to RING_RADIUS so it never asks for a chunk outside what's
+    // needed anyway. Every other LOD level already renders at its own
+    // fine detail via buildChunk()+QEM, so this never touches level > 0.
+    const fineRadius = level === 0 ? Math.min(NEAR_FIELD_RADIUS, RING_RADIUS) : -1;
+    for (let dz = -RING_RADIUS; dz <= RING_RADIUS; dz++) {
+      for (let dx = -RING_RADIUS; dx <= RING_RADIUS; dx++) {
+        const cx = ccx + dx, cz = ccz + dz;
+        const wx0 = cx * size, wx1 = wx0 + size;
+        const wz0 = cz * size, wz1 = wz0 + size;
+        // Only skip if this chunk's ENTIRE footprint already lies inside
+        // the actual (grid-aligned) coverage of finer levels — a partial
+        // overlap is kept rather than dropped, so we can only ever get
+        // (harmless) double-coverage at a boundary, never a gap.
+        if (level > 0 && wx0 >= covMinX && wx1 <= covMaxX && wz0 >= covMinZ && wz1 <= covMaxZ) continue;
+        const isFine = fineRadius >= 0 && Math.abs(dx) <= fineRadius && Math.abs(dz) <= fineRadius;
+        set.set(keyFor(level, cx, cz), [level, cx, cz, isFine]);
+      }
+    }
+    // Expand the covered rect to this level's full candidate ring (in world
+    // space), so the next, coarser level tests containment against reality.
+    const bx0 = (ccx - RING_RADIUS) * size, bx1 = (ccx + RING_RADIUS + 1) * size;
+    const bz0 = (ccz - RING_RADIUS) * size, bz1 = (ccz + RING_RADIUS + 1) * size;
+    if (level === 0) {
+      covMinX = bx0; covMaxX = bx1; covMinZ = bz0; covMaxZ = bz1;
+      // Force every level-0 chunk that has any density edit in it
+      // (minedChunkBounds) into the needed set as a fine/volumetric
+      // chunk — regardless of RING_RADIUS or NEAR_FIELD_RADIUS, i.e.
+      // even if it's well outside the player's immediate near field.
+      // This is what keeps a tunnel's walls/roof/floor drawn (and, via
+      // buildAndInstallChunk's fine path, correctly hollow) no matter how
+      // far the player has walked from it, instead of the chunk reverting
+      // to an ordinary buildChunk() mesh — which has no representation
+      // for a vertical gap at all — the moment it falls outside the near
+      // field. Each forced chunk's footprint is also folded into the
+      // level-0 coverage rect so the coarser-level loop below correctly
+      // skips drawing an (unmined) heightfield chunk on top of it — that
+      // skip is what stops the two-surfaces-at-once flicker at the
+      // near-field boundary.
+      for (const ckey of minedChunkBounds.keys()) {
+        const [tcx, tcz] = level0ChunkXZFromKey(ckey);
+        set.set(keyFor(0, tcx, tcz), [0, tcx, tcz, true]);
+        const twx0 = tcx * size, twx1 = twx0 + size;
+        const twz0 = tcz * size, twz1 = twz0 + size;
+        if (twx0 < covMinX) covMinX = twx0;
+        if (twx1 > covMaxX) covMaxX = twx1;
+        if (twz0 < covMinZ) covMinZ = twz0;
+        if (twz1 > covMaxZ) covMaxZ = twz1;
+      }
+    }
+    else { covMinX = Math.min(covMinX, bx0); covMaxX = Math.max(covMaxX, bx1); covMinZ = Math.min(covMinZ, bz0); covMaxZ = Math.max(covMaxZ, bz1); }
+  }
+  return set;
+}
+
+// Lower score = generated sooner. Level dominates (finer LOD first); within
+// the same level, closer chunks go first; facing direction is a minor
+// tiebreaker so roughly-in-front chunks edge out ones behind the camera.
+function chunkPriority(level, cx, cz, px, pz, fx, fz) {
+  const size = chunkWorldSize(level);
+  const centerX = (cx + 0.5) * size, centerZ = (cz + 0.5) * size;
+  const dx = centerX - px, dz = centerZ - pz;
+  const dist = Math.hypot(dx, dz);
+  const front = dist > 0 ? (dx * fx + dz * fz) / dist : 1; // 1 = ahead, -1 = behind
+  const facingPenalty = (1 - front) * size; // scaled by chunk size so it stays a minor nudge at every LOD level
+  return level * 1e7 + dist + facingPenalty;
+}
+
+function updateChunks() {
+  const needed = neededSet(viewLevel, camera.position.x, camera.position.z);
+
+  // Mark chunks that are no longer needed as obsolete, but do NOT touch the
+  // scene yet — they stay rendered as a fallback. If a chunk that was
+  // marked obsolete becomes needed again (player backtracked), un-mark it.
+  for (const key of chunkEntries.keys()) {
+    if (!needed.has(key)) pendingRemoval.add(key);
+  }
+  for (const key of pendingRemoval) {
+    if (needed.has(key)) pendingRemoval.delete(key);
+  }
+
+  // Build the generation queue for needed chunks not currently in the
+  // scene. A chunk sitting in the cache is reinstated directly (no
+  // buildChunk() call); only a true miss goes on the queue.
+  const px = camera.position.x, pz = camera.position.z;
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw); // camera forward, projected to XZ
+  genQueue = [];
+  for (const [key, val] of needed) {
+    const [level, cx, cz, fine] = val;
+    const existing = chunkEntries.get(key);
+    // Fine-ness mismatch (see evictEntry() above) means the installed mesh
+    // is the wrong variant for what's needed now — fall through and queue
+    // a rebuild instead of treating the key's mere presence as "done".
+    if (existing) {
+      // Same variant AND not stale from a mining edit: truly done, skip.
+      // A dirty entry stays in the queue even though its variant already
+      // matches — see processQueue()'s note on why that rebuild is left
+      // to the throttle instead of happening here.
+      if (existing.fine === fine && !dirtyChunks.has(key)) continue;
+    } else if (chunkCache.has(key)) {
+      const entry = chunkCache.get(key);
+      if (entry.fine === fine) {
+        chunkCache.delete(key);
+        scene.add(entry.mesh);
+        chunkEntries.set(key, entry);
+        runningTriCount += entry.triCount;
+        continue;
+      }
+      // Wrong-variant cache entry — leave it for normal LRU eviction later
+      // and fall through to queue a fresh build of the correct variant.
+    }
+    genQueue.push({ key, level, cx, cz, fine, score: chunkPriority(level, cx, cz, px, pz, fx, fz) });
+  }
+  genQueue.sort((a, b) => b.score - a.score); // ascending priority popped from the end
+
+  maybeFlushObsolete();
+}
+
+// A stale chunk is safe to retire once nothing still queued would show up
+// in its footprint — NOT once the whole global genQueue is empty. Gating
+// on the whole queue was the bug: in an effectively infinite world the
+// player keeps moving, so genQueue is almost never fully empty, which
+// meant stale chunks (e.g. the near-field patches built back at spawn)
+// sat in pendingRemoval — still rendered, still in the scene — forever,
+// no matter how far away the player walked. They'd only get visually
+// buried once some later, larger LOD chunk happened to be drawn over/
+// around them, which is exactly the "stays put and gets covered up by
+// LODs" symptom.
+function footprintStillQueued(entry) {
+  const size = chunkWorldSize(entry.level);
+  const wx0 = entry.cx * size, wx1 = wx0 + size;
+  const wz0 = entry.cz * size, wz1 = wz0 + size;
+  for (const q of genQueue) {
+    const qsize = chunkWorldSize(q.level);
+    const qx0 = q.cx * qsize, qx1 = qx0 + qsize;
+    const qz0 = q.cz * qsize, qz1 = qz0 + qsize;
+    if (qx1 > wx0 && qx0 < wx1 && qz1 > wz0 && qz0 < wz1) return true; // overlap
+  }
+  return false;
+}
+function maybeFlushObsolete() {
+  if (pendingRemoval.size === 0) return;
+  for (const key of Array.from(pendingRemoval)) {
+    const entry = chunkEntries.get(key);
+    if (!entry) { pendingRemoval.delete(key); continue; }
+    if (footprintStillQueued(entry)) continue; // its own replacement isn't ready yet — keep as fallback
+    scene.remove(entry.mesh);
+    runningTriCount -= entry.triCount;
+    chunkEntries.delete(key);
+    if (dirtyChunks.has(key)) {
+      // Went stale (mining edit) before its throttled rebuild ever ran,
+      // and it's about to leave the scene anyway — drop it outright
+      // rather than caching stale geometry that updateChunks()'s /
+      // installChunkImmediate()'s "already in cache" fast path could
+      // later reinstall unrebuilt.
+      disposeEntry(entry);
+      dirtyChunks.delete(key);
+    } else {
+      cachePut(key, entry);
+    }
+    pendingRemoval.delete(key);
+  }
+}
+
+// Called right after a terrain edit (a mine). The margin accounts for
+// shared border vertices and skirts overlapping into the neighbor chunk.
+//
+// BUG FIXED (lag spike on every mining tick): this used to remove+dispose
+// affected chunks from the scene immediately, then call updateChunks() to
+// queue their rebuild through the normal, THROTTLED (CHUNKS_PER_FRAME)
+// path. That throttle never actually applied, though: ensureNearFieldImmediate()/
+// ensurePlayerFooting() run UNCONDITIONALLY, synchronously, at the very
+// start of every single animate() frame (see the "Fix, part 1/2" notes
+// above) — and with the chunk now simply MISSING from chunkEntries, the
+// very next frame's call to them saw a hole to fill and built the whole
+// near-field patch right there, unthrottled, ahead of processQueue() and
+// the render — a full buildFinePatchChunk() (up to SAMPLE_BUDGET density
+// samples plus a Surface Nets pass) crammed into one frame, every time a
+// mining swing landed. That's the spike.
+// Fix: don't remove the stale mesh at all — mark its key dirty and leave
+// it exactly where it is (same pattern pendingRemoval already uses for
+// "hole while regenerating"). installChunkImmediate() only force-rebuilds
+// a MISSING chunk, so a dirty-but-still-present entry is left alone by
+// the immediate path and instead picked up by updateChunks()/processQueue()
+// like any other queued build — spread across CHUNKS_PER_FRAME per frame
+// alongside everything else, with the stale (pre-edit) mesh standing in
+// as its own fallback for the frame or two until that throttled rebuild
+// actually runs.
+function invalidateChunksAt(x, z, marginOverride) {
+  const margin = marginOverride !== undefined ? marginOverride : MINE_STEP * 2;
+  for (const [key, entry] of Array.from(chunkEntries.entries())) {
+    const size = chunkWorldSize(entry.level);
+    const wx0 = entry.cx * size - margin, wx1 = entry.cx * size + size + margin;
+    const wz0 = entry.cz * size - margin, wz1 = entry.cz * size + size + margin;
+    if (x < wx0 || x > wx1 || z < wz0 || z > wz1) continue;
+    dirtyChunks.add(key);
+  }
+  // Cached (not currently visible) chunks aren't shown as a fallback for
+  // anything, so there's no benefit to keeping their stale geometry around
+  // — drop them outright, same as before, and they'll build fresh next
+  // time they're actually needed.
+  for (const [key, entry] of Array.from(chunkCache.entries())) {
+    const size = chunkWorldSize(entry.level);
+    const wx0 = entry.cx * size - margin, wx1 = entry.cx * size + size + margin;
+    const wz0 = entry.cz * size - margin, wz1 = entry.cz * size + size + margin;
+    if (x < wx0 || x > wx1 || z < wz0 || z > wz1) continue;
+    disposeEntry(entry);
+    chunkCache.delete(key);
+  }
+  updateChunks();
+}
+
+// Builds one chunk (fine patch or ordinary buildChunk+QEM) and installs it
+// into the scene/chunkEntries. Pulled out of processQueue() so the same
+// build-and-install logic can also be called immediately, outside the
+// CHUNKS_PER_FRAME throttle, for the one chunk that matters most: whatever
+// is directly under the player's feet right now (see ensurePlayerFooting()
+// below).
+function buildAndInstallChunk(key, level, cx, cz, fine) {
+  let mesh, triCount, mainVertCount;
+  if (fine) {
+    // Fine near-field patch: already a complete, ready-to-add mesh with
+    // its own (small, bounded) geometry — no separate skirt build/merge
+    // step, no QEM pass. See buildFinePatchChunk() for why this stays
+    // cheap even though it's no longer scoped to one hardcoded chunk.
+    ({ mesh, triCount, mainVertCount } = buildFinePatchChunk(cx, cz));
+  } else {
+    const built = buildChunk(level, cx, cz);
+    const geo = mergeChunkGeometries(built.mainGeo, built.skirtGeo);
+    mesh = new THREE.Mesh(geo, [terrainMaterial, skirtMaterial]);
+    triCount = built.triCount;
+    mainVertCount = built.mainVertCount;
+  }
+  mesh.frustumCulled = true;
+  // Perf: this mesh is placed once at identity transform and never
+  // moved/rotated/scaled again, so there's no need for Three.js to
+  // recompute its local+world matrix on every single frame for the
+  // life of the chunk. With hundreds of chunks live at once this is a
+  // real, free win.
+  mesh.matrixAutoUpdate = false;
+  mesh.matrixWorldAutoUpdate = false;
+  // Mining raycasts hit both real terrain AND the cosmetic seam skirts
+  // (same mesh, second material group) — this tells them apart: any
+  // hit triangle whose first vertex index is >= mainVertCount is a skirt.
+  // Fine patches have no skirt group, so mainVertCount already covers
+  // every vertex and nothing is ever treated as a skirt hit.
+  mesh.userData.mainVertCount = mainVertCount;
+  scene.add(mesh);
+  chunkEntries.set(key, { mesh, triCount, level, cx, cz, mainVertCount, fine });
+  runningTriCount += triCount;
+}
+
+// Removes+disposes whatever is currently installed at `key` (in the scene,
+// via chunkEntries) so a mismatched variant (fine vs ordinary) can be
+// rebuilt fresh. Bug this fixes: keyFor(level,cx,cz) does not distinguish
+// a "fine" near-field patch from an "ordinary" QEM/skirt chunk at the same
+// coordinates, so every call site that gated on plain key-presence
+// (`if (chunkEntries.has(key)) return/continue`) treated an ordinary chunk
+// as already satisfying a later request for the fine version of that same
+// chunk — silently dropping the upgrade. In practice an ordinary chunk
+// almost always claims a given (level 0) key BEFORE the player gets close
+// enough for it to qualify as near-field, since it spends time in the
+// outer part of the ring first — so the fine/detailed mesh only ever
+// actually appeared where nothing had claimed the key yet, i.e. right at
+// spawn, and never moved from there as the player walked away.
+function evictEntry(key) {
+  const entry = chunkEntries.get(key);
+  if (!entry) return;
+  scene.remove(entry.mesh);
+  runningTriCount -= entry.triCount;
+  disposeEntry(entry);
+  chunkEntries.delete(key);
+  pendingRemoval.delete(key);
+  dirtyChunks.delete(key);
+}
+
+// The player's own analytic ground height (terrainHeight(), used for
+// gravity/collision) is always exact and instant everywhere in the world —
+// it's a pure function call, not something read off a mesh. But the
+// VISIBLE ground the player is standing on comes from a chunk mesh, which
+// only ever gets (re)built through the throttled genQueue (CHUNKS_PER_FRAME
+// per frame, farthest/coarsest chunks queued alongside it). Sprinting into
+// new terrain can outrun that throttle: the fine chunk under the player's
+// feet is still sitting in genQueue behind other chunks, so for a few
+// frames the OLD mesh (or none) is what's actually rendered there — which
+// reads as "walking into terrain" even though collision itself never
+// lagged. Mining "fixes" it because invalidateChunksAt() forces that one
+// column's chunk to be requeued and it happens to be the very next thing
+// built.
+// Fix, part 1: whenever the player crosses into a different level-0 chunk,
+// immediately (synchronously, no queue) build every "fine" chunk in the
+// near-field ring around their NEW chunk that isn't already built — not
+// just the one they're standing on, but the whole small neighborhood
+// (NEAR_FIELD_RADIUS) around it. That's the actual fix for sprinting: a
+// fast player can cross more than one chunk boundary's worth of "ahead of
+// them" ground between generation passes, so it's not enough to patch the
+// one tile under their feet — the ring has to be caught up to the new
+// chunk the instant they arrive in it, the same way updateChunks() already
+// recomputes the full needed-set on every crossing (see the ccx!==lastCCX
+// check in updateMovement below) — this just does the near/fine part of
+// that eagerly instead of leaving it for the throttled queue.
+function installChunkImmediate(key, level, cx, cz, fine) {
+  const existing = chunkEntries.get(key);
+  if (existing) {
+    if (existing.fine === fine) return; // already the right variant
+    evictEntry(key); // wrong variant (e.g. ordinary chunk where fine is now needed) — rebuild below
+  } else if (chunkCache.has(key)) {
+    const cached = chunkCache.get(key);
+    if (cached.fine === fine) {
+      chunkCache.delete(key);
+      scene.add(cached.mesh);
+      chunkEntries.set(key, cached);
+      runningTriCount += cached.triCount;
+      pendingRemoval.delete(key);
+      return;
+    }
+    // Cached copy is the wrong variant too — drop it, rebuild fresh below.
+    chunkCache.delete(key);
+    disposeEntry(cached);
+  }
+  buildAndInstallChunk(key, level, cx, cz, fine);
+  pendingRemoval.delete(key);
+  // Remove the now-redundant queued copy, if any, so processQueue doesn't
+  // build the same chunk a second time.
+  const qi = genQueue.findIndex(e => e.key === key);
+  if (qi !== -1) genQueue.splice(qi, 1);
+}
+
+function ensureNearFieldImmediate(px, pz) {
+  const size0 = chunkWorldSize(0);
+  const ccx = Math.floor(px / size0), ccz = Math.floor(pz / size0);
+  const r = Math.min(NEAR_FIELD_RADIUS, RING_RADIUS);
+  for (let dz = -r; dz <= r; dz++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const cx = ccx + dx, cz = ccz + dz;
+      installChunkImmediate(keyFor(0, cx, cz), 0, cx, cz, true);
+    }
+  }
+}
+
+// Fix, part 2: a cheap per-frame safety net for the one chunk directly
+// underfoot, in case a single frame's movement (very high speed, or a
+// teleport) jumps further than the ring above covers in one go.
+function ensurePlayerFooting() {
+  const size0 = chunkWorldSize(0);
+  const ccx = Math.floor(feetX / size0), ccz = Math.floor(feetZ / size0);
+  installChunkImmediate(keyFor(0, ccx, ccz), 0, ccx, ccz, true);
+}
+
+function processQueue() {
+  let n = 0;
+  while (genQueue.length && n < CHUNKS_PER_FRAME) {
+    const { key, level, cx, cz, fine } = genQueue.pop();
+    n++;
+    const existing = chunkEntries.get(key);
+    if (existing) {
+      // Right variant AND not stale — nothing to do. A dirty entry falls
+      // through to a rebuild below even though its variant already
+      // matches: this is where a mining-invalidated chunk actually gets
+      // rebuilt, throttled at CHUNKS_PER_FRAME like everything else
+      // instead of forced synchronously — see invalidateChunksAt().
+      if (existing.fine === fine && !dirtyChunks.has(key)) continue;
+      evictEntry(key); // wrong variant, or dirty — replace it
+    }
+    dirtyChunks.delete(key);
+    buildAndInstallChunk(key, level, cx, cz, fine);
+  }
+  // A chunk generated just now may have been the last thing pendingRemoval
+  // fallbacks were waiting on.
+  if (!genQueue.length) maybeFlushObsolete();
+}
+
+// ---------------------------------------------------------------------
+// View-distance slider / textbox (logarithmic layers: each level doubles distance)
+// ---------------------------------------------------------------------
+let viewLevel = 2;
+const slider = document.getElementById('slider');
+const textbox = document.getElementById('textbox');
+const levelVal = document.getElementById('levelVal');
+const distLabel = document.getElementById('distLabel');
+
+function totalViewDistance(vLevel) {
+  const maxIdx = vLevel - 1;
+  const size = chunkWorldSize(maxIdx);
+  return (RING_RADIUS + 1) * size;
+}
+function formatDistance(d) {
+  if (d > 1e6) return (d/1e6).toFixed(2) + ' Mkm (world units)';
+  if (d > 1e3) return (d/1e3).toFixed(2) + ' km (world units)';
+  return d.toFixed(0) + ' units';
+}
+function setViewLevel(v) {
+  v = Math.max(1, Math.min(22, Math.round(Number(v) || 1)));
+  viewLevel = v;
+  slider.value = v; textbox.value = v; levelVal.textContent = v;
+  const dist = totalViewDistance(v);
+  scene.fog.far = dist;
+  scene.fog.near = 0; // fade scales 0% at the player to 100% at the view-distance edge
+  distLabel.textContent = 'Approx. distance: ' + formatDistance(dist);
+  updateChunks();
+}
+slider.addEventListener('input', () => setViewLevel(slider.value));
+textbox.addEventListener('change', () => setViewLevel(textbox.value));
+
+const ringSlider = document.getElementById('ringSlider');
+const ringTextbox = document.getElementById('ringTextbox');
+const ringVal = document.getElementById('ringVal');
+function setRingRadius(v) {
+  v = Math.max(1, Math.min(5, Math.round(Number(v) || 1)));
+  RING_RADIUS = v;
+  ringSlider.value = v; ringTextbox.value = v; ringVal.textContent = v;
+  // totalViewDistance() depends on RING_RADIUS, so re-derive the fog
+  // distance/label too, then rebuild the chunk set at the new radius.
+  setViewLevel(viewLevel);
+}
+ringSlider.addEventListener('input', () => setRingRadius(ringSlider.value));
+ringTextbox.addEventListener('change', () => setRingRadius(ringTextbox.value));
+
+const coordsEl = document.getElementById('coords');
+
+// ---------------------------------------------------------------------
+// Controls: pointer-lock mouse look + grounded WASD walk/jump.
+// The player is a grounded 3D object (feet position + eye height) instead
+// of a flying camera — gravity pulls it down onto the LIVE terrain height
+// (terrainHeight(), so dug pits/shafts are fall/walk-into-able), Space
+// jumps only while grounded, and looking up/down no longer tilts the
+// walk direction into the sky or ground.
+// ---------------------------------------------------------------------
+let yaw = Math.PI, pitch = -0.12;
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  // E frees/re-locks the cursor from the camera so GUI elements (the
+  // slider panel, hotbar, etc.) can be clicked without also turning the
+  // camera. Ignore it while a text field has focus so it can still be typed.
+  if (e.code === 'KeyE' && !(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA'))) {
+    toggleCursorLock();
+  }
+});
+document.addEventListener('keyup', e => keys[e.code] = false);
+function toggleCursorLock() {
+  if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
+  else renderer.domElement.requestPointerLock();
+}
+let mouseDown = false;
+renderer.domElement.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  if (document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock();
+  mouseDown = true; // held across the async lock grant, so a press-and-hold starts mining as soon as lock lands
+});
+window.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; });
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement === renderer.domElement) {
+    yaw -= e.movementX * 0.0022;
+    pitch -= e.movementY * 0.0022;
+    pitch = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, pitch));
+  }
+});
+
+const BASE_SPEED   = 6.5;   // grounded walking speed, world units/sec
+const SPRINT_MULT  = 1.8;
+const GRAVITY      = -32;   // world units/sec^2
+const JUMP_SPEED   = 11;    // world units/sec, upward
+const EYE_HEIGHT   = 1.7;
+const PLAYER_RADIUS = 0.35; // horizontal collision radius, world units
+const PLAYER_HEIGHT = 1.8;  // vertical span checked for wall collision, feet to just above eye height
+
+let feetX = 0, feetY = 0, feetZ = 0.0001; // player's grounded position; camera = feet + EYE_HEIGHT
+let playerVelY = 0;
+let grounded = false;
+let lastCCX = NaN, lastCCZ = NaN;
+
+// Perf: scratch objects reused every frame instead of allocated fresh —
+// updateMovement() runs 60+ times/sec, and `new THREE.Euler/Vector3` each
+// call was pure avoidable GC churn for values we immediately discard.
+const _lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _yawQuat = new THREE.Quaternion();
+const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _move = new THREE.Vector3();
+
+// Finds the surface the player should rest on at (x,z), given where their
+// feet currently are — generalizes "the ground" to a column that may now
+// have several solid spans (a tunnel) instead of just one. bands[] is
+// sorted top to bottom, so the first span whose top is at/below the
+// player's current Y is the nearest matter beneath them: normally that's
+// just bands[0] (walking on the surface), but if they've walked into a
+// bored-through tunnel and dropped below its roof span, this naturally
+// finds the tunnel's own floor span instead. Falling straight through
+// every known span (shouldn't happen in normal play) is caught by resting
+// on the deepest span's top rather than dropping forever.
+//
+// This is the density field's OWN answer, though — what the terrain IS,
+// not necessarily what's actually DRAWN there (far chunks are QEM-
+// decimated, LOD boundaries carry cosmetic skirts, the near-field mesh is
+// itself only a Surface Nets approximation of the field between lattice
+// points). Kept as: (a) the reference height groundRayAt() below starts
+// its downward ray above, and (b) a same-frame fallback for the rare
+// moment (a chunk crossing, a teleport, sprint outrunning generation) the
+// mesh directly underfoot hasn't finished (re)building and a raycast
+// against it comes back with nothing to hit.
+function analyticGroundBelowFeet(x, z, y) {
+  const bands = getBands(x, z);
+  for (const b of bands) {
+    if (b.top <= y + 0.02) return b.top;
+  }
+  return bands[bands.length - 1].top;
+}
+
+// ---------------------------------------------------------------------
+// GROUND COLLISION — raycast against the actual RENDERED triangles.
+// ---------------------------------------------------------------------
+// The density field is the source of truth for what the terrain IS, but
+// the player stands on whatever got actually DRAWN, and those two can
+// disagree (decimation, skirts, the finite resolution of the Surface
+// Nets extraction) — which is exactly what read as "broken" collision on
+// the new density-field terrain: floating above ground the mesh dips
+// below, or catching on ground the mesh stands proud of. Fix: cast a ray
+// straight down from above the player and rest on whatever REAL triangle
+// (same target set/skirt-filter as mining's own raycast, see
+// pickMiningTarget) it actually reports, instead of asking the density
+// formula for an answer that may not match what's on screen.
+const GROUND_RAY_UP   = 6;  // ray start height above the reference Y — must clear the tallest
+                             // single-frame step (jump apex, a ledge) so the ray never starts
+                             // already inside solid ground
+const GROUND_RAY_DOWN  = 40; // how far below that the ray searches before giving up
+const _groundRaycaster = new THREE.Raycaster();
+_groundRaycaster.far = GROUND_RAY_UP + GROUND_RAY_DOWN;
+const _groundRayDir    = new THREE.Vector3(0, -1, 0);
+const _groundRayOrigin = new THREE.Vector3();
+
+// Same "real terrain, not coarse-LOD/skirt geometry" target set mining
+// already raycasts against (pickMiningTarget) — standing on a cosmetic
+// seam curtain, or a far decimated chunk, would be just as wrong as
+// mining one.
+function groundRaycastTargets() {
+  const arr = [];
+  for (const entry of chunkEntries.values()) {
+    if (entry.level > 1) continue;
+    arr.push(entry.mesh);
+  }
+  return arr;
+}
+// One straight-down ray at (x,z), starting above `refY`. Returns the
+// world-Y of the closest REAL (non-skirt) triangle it hits, or null if
+// nothing real is under this exact point within GROUND_RAY_DOWN.
+function groundRayAt(x, z, refY, targets) {
+  _groundRayOrigin.set(x, refY + GROUND_RAY_UP, z);
+  _groundRaycaster.set(_groundRayOrigin, _groundRayDir);
+  const hits = _groundRaycaster.intersectObjects(targets, false);
+  for (const hit of hits) {
+    const mainVertCount = hit.object.userData.mainVertCount || 0;
+    if (hit.faceIndex * 3 >= mainVertCount) continue; // skirt triangle — cosmetic, not real ground
+    return hit.point.y;
+  }
+  return null;
+}
+
+// A single ray straight down the player's center can drop clean through
+// a needle-thin gap in the mesh (an unsealed LOD seam, a mining sphere
+// that only grazed this one exact lattice column) that a body with real
+// WIDTH would simply straddle instead of falling into. So sample several
+// rays across the player's own footprint — center plus a ring at
+// PLAYER_RADIUS — and rest on the HIGHEST hit: whichever point of the
+// footprint finds solid ground first is what actually stops a real body,
+// so that's what stops this one too.
+const GROUND_PROBE_OFFSETS = (() => {
+  const RING = 6;
+  const pts = [[0, 0]];
+  for (let i = 0; i < RING; i++) {
+    const a = (i / RING) * Math.PI * 2;
+    pts.push([Math.cos(a) * PLAYER_RADIUS, Math.sin(a) * PLAYER_RADIUS]);
+  }
+  return pts;
+})();
+function groundBelowFeet(x, z, y) {
+  const fallback = analyticGroundBelowFeet(x, z, y);
+  const targets = groundRaycastTargets();
+  if (!targets.length) return fallback; // nothing built here yet this frame
+  let best = -Infinity, found = false;
+  for (const [ox, oz] of GROUND_PROBE_OFFSETS) {
+    const hitY = groundRayAt(x + ox, z + oz, y, targets);
+    if (hitY !== null && hitY > best) { best = hitY; found = true; }
+  }
+  return found ? best : fallback; // no real triangle under any probe — fall back rather than drop through the world
+}
+
+// Horizontal wall collision. Previously nothing in the file ever tested
+// movement against anything but the column directly beneath the player's
+// (already-moved) feet — groundBelowFeet() only resolves vertically, so
+// every wall in the game, tunnel or ordinary cliff, was purely cosmetic
+// and the player could walk straight through it.
+//
+// BUG FIXED (first pass): the original version of this check compared the
+// destination column's bands directly against the player's CURRENT feetY
+// with no allowance for stepping up onto slightly higher ground. On
+// anything but perfectly flat terrain — which on this ridged-mountain
+// heightfield (BASE_AMPLITUDE 260, sloped almost everywhere) is nearly the
+// entire world outside tunnels — the very next column underfoot is almost
+// always a little HIGHER than the current one, so "does this column's top
+// sit above my current feet" was true for ordinary uphill walking too, not
+// just real walls. That made every incline an invisible wall: worse than
+// the walk-through-tunnel-walls bug it replaced, and far more pervasive
+// since it hit ordinary terrain, not just mined columns.
+//
+// Fix: a destination is only a WALL if there's no reachable surface within
+// STEP_HEIGHT of the player's current feet at all (steppableLandingY finds
+// none) — a small ledge/slope is a step, not a wall. Once a landing height
+// is found, headroomBlocked() separately checks that standing there
+// doesn't put the player's own height span into some OTHER band (a low
+// tunnel roof, an overhang) — that's the real "wall/ceiling" case this
+// whole system exists to catch.
+const STEP_HEIGHT = 0.6; // world units — max ledge a step absorbs before it counts as a wall
+
+// BUG FIXED (stuck/choppy movement near mined areas): this used to answer
+// purely from getBands() — the ANALYTIC density field — while vertical
+// (fall/stand) collision was already fixed to raycast the actual RENDERED
+// mesh instead (see the "GROUND COLLISION" note above: "the player stands
+// on whatever got actually DRAWN"). Horizontal wall collision never got
+// the same fix, so it kept comparing against a surface the player couldn't
+// see. On smooth unmined ground the two agree closely enough not to
+// matter, but naive Surface Nets only emits one AVERAGED vertex per cell
+// (see surfaceNets() above), so a small spherical dig (MINE_RADIUS is
+// smaller than one DENS_STEP lattice cell) can visually smooth away or
+// reshape a bump of terrain that the analytic field still reports as
+// solid rock — an invisible wall exactly where mining just opened things
+// up. That reads as "choppy, can't walk into/through a spot I just dug,"
+// and jumping "unsticks" it because grounded is false while airborne, so
+// gravity's own real-mesh ground check (groundBelowFeet) — not this
+// analytic wall check — is what's resolving the player's position.
+// Fix: prefer the same real, non-skirt triangles groundBelowFeet already
+// trusts. Only fall back to the analytic bands when no real mesh exists
+// under this column yet (chunk not built this frame) — same fallback
+// groundBelowFeet already uses for the same reason.
+function steppableLandingY(x, z, verticalRefY) {
+  const targets = groundRaycastTargets();
+  if (targets.length) {
+    const hitY = groundRayAt(x, z, verticalRefY, targets);
+    if (hitY !== null) return hitY <= verticalRefY + STEP_HEIGHT ? hitY : null;
+  }
+  // Fallback: analytic bands (no real mesh under this column yet).
+  const bands = getBands(x, z);
+  for (const b of bands) {
+    if (b.top <= verticalRefY + STEP_HEIGHT) return b.top;
+  }
+  return null;
+}
+// Would standing with feet at landingY put any OTHER solid band inside the
+// player's own [landingY, landingY+PLAYER_HEIGHT) span — a low ceiling
+// (tunnel roof, overhang) the player's head would be inside of. Still
+// analytic (bands, not the mesh) — headroom is a coarser, secondary
+// safety check, and unlike steppableLandingY it isn't the direct source
+// of the "invisible wall" symptom above, so it's left as-is except for
+// how it identifies "the landing surface itself": landingY can now come
+// from a real-mesh raycast (see above) rather than always from a band's
+// own `top`, so it won't necessarily equal any band's top to exact
+// floating-point precision anymore — match the CLOSEST band instead of
+// requiring an exact hit, so the player's own landing surface is never
+// mistaken for an overhang blocking itself.
+function headroomBlocked(x, z, landingY) {
+  const bands = getBands(x, z);
+  if (!bands.length) return false;
+  let landingBand = bands[0], bestDist = Math.abs(bands[0].top - landingY);
+  for (const b of bands) {
+    const dist = Math.abs(b.top - landingY);
+    if (dist < bestDist) { bestDist = dist; landingBand = b; }
+  }
+  const yHigh = landingY + PLAYER_HEIGHT;
+  for (const b of bands) {
+    if (b === landingBand) continue;
+    if (b.top > landingY && b.bottom < yHigh) return true;
+  }
+  return false;
+}
+function columnBlockedForPlayer(x, z, feetYNow) {
+  const landingY = steppableLandingY(x, z, feetYNow);
+  if (landingY === null) return true; // nothing reachable within a step — a wall
+  return headroomBlocked(x, z, landingY);
+}
+// Four probe points around the player's own radius, in addition to the
+// center — cheap point sampling rather than a true swept capsule, but
+// enough to stop a wall from being skippable by aiming a corner through
+// it, which a single center-point check would allow.
+function playerBlockedAt(x, z, feetYNow) {
+  if (columnBlockedForPlayer(x, z, feetYNow)) return true;
+  const r = PLAYER_RADIUS;
+  return columnBlockedForPlayer(x + r, z, feetYNow) ||
+         columnBlockedForPlayer(x - r, z, feetYNow) ||
+         columnBlockedForPlayer(x, z + r, feetYNow) ||
+         columnBlockedForPlayer(x, z - r, feetYNow);
+}
+// Axis-separated move-and-slide: try the full desired step; if blocked,
+// try each axis alone so the player slides along a wall instead of
+// stopping dead the instant they're not moving exactly parallel to it.
+function resolveHorizontalMove(dx, dz) {
+  const feetYNow = feetY;
+  const tryX = feetX + dx, tryZ = feetZ + dz;
+  if (!playerBlockedAt(tryX, tryZ, feetYNow)) { feetX = tryX; feetZ = tryZ; return; }
+  if (dx !== 0 && !playerBlockedAt(tryX, feetZ, feetYNow)) { feetX = tryX; return; }
+  if (dz !== 0 && !playerBlockedAt(feetX, tryZ, feetYNow)) { feetZ = tryZ; return; }
+  // Both axes blocked — stay put this frame.
+}
+
+function updateMovement(dt) {
+  // Look direction (full pitch+yaw) drives only the camera's orientation.
+  _lookEuler.set(pitch, yaw, 0, 'YXZ');
+  camera.quaternion.setFromEuler(_lookEuler);
+
+  // Walk direction uses yaw only, so looking up/down doesn't fly the
+  // player into the terrain or the sky — that's the "grounded" part.
+  _yawEuler.set(0, yaw, 0, 'YXZ');
+  _yawQuat.setFromEuler(_yawEuler);
+  _forward.set(0, 0, -1).applyQuaternion(_yawQuat);
+  _right.set(1, 0, 0).applyQuaternion(_yawQuat);
+
+  const sprint = (keys['ShiftLeft'] || keys['ShiftRight']) ? SPRINT_MULT : 1;
+  const speed = BASE_SPEED * sprint;
+  const move = _move.set(0, 0, 0);
+  if (keys['KeyW']) move.add(_forward);
+  if (keys['KeyS']) move.sub(_forward);
+  if (keys['KeyD']) move.add(_right);
+  if (keys['KeyA']) move.sub(_right);
+  if (move.lengthSq() > 0) {
+    move.normalize();
+    // Was: feetX/feetZ += unconditionally, with no wall check at all (see
+    // resolveHorizontalMove() above for why that made every wall, tunnel
+    // or ordinary cliff, purely cosmetic).
+    resolveHorizontalMove(move.x * speed * dt, move.z * speed * dt);
+  }
+
+  // Gravity + ground collision against the LIVE (possibly mined, possibly
+  // tunneled) terrain directly under the player's feet.
+  playerVelY += GRAVITY * dt;
+  feetY += playerVelY * dt;
+  const ground = groundBelowFeet(feetX, feetZ, feetY);
+  if (feetY <= ground) {
+    feetY = ground;
+    playerVelY = 0;
+    grounded = true;
+  } else {
+    grounded = false;
+  }
+  if (keys['Space'] && grounded) {
+    playerVelY = JUMP_SPEED;
+    grounded = false;
+  }
+
+  camera.position.set(feetX, feetY + EYE_HEIGHT, feetZ);
+  coordsEl.textContent = `x: ${feetX.toFixed(1)}   y: ${feetY.toFixed(1)}   z: ${feetZ.toFixed(1)}`;
+
+  const size0 = chunkWorldSize(0);
+  const ccx = Math.floor(feetX / size0), ccz = Math.floor(feetZ / size0);
+  if (ccx !== lastCCX || ccz !== lastCCZ) {
+    lastCCX = ccx; lastCCZ = ccz;
+    updateChunks();
+  }
+  // Unconditional, every single frame, no gate: recompute and build the
+  // near-field ring around wherever the player is RIGHT NOW. Not "only
+  // when we detect a chunk crossing" — every frame, full stop. This is
+  // what guarantees the fine/near terrain is glued to the player instead
+  // of depending on crossing-detection ever being right.
+  ensureNearFieldImmediate(feetX, feetZ);
+  ensurePlayerFooting();
+}
+
+// ---------------------------------------------------------------------
+// Mining: raycast-pick the terrain triangle under the crosshair, hold the
+// mouse to break it. On completion this modifies the height "noise point"
+// at that column (see the terrain-edit system near the top of the file),
+// reloads the affected chunk(s), and rounds the mined triangle's hardness
+// into one of four collectible material types added to the hotbar.
+// Placement isn't implemented yet — this pass is break + collect only.
+// ---------------------------------------------------------------------
+const MINE_RANGE = 8; // max reach, world units
+const raycaster = new THREE.Raycaster();
+raycaster.far = MINE_RANGE;
+const _rayDir = new THREE.Vector3();
+
+function pickMiningTarget() {
+  if (document.pointerLockElement !== renderer.domElement) return null;
+  _rayDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  raycaster.set(camera.position, _rayDir);
+  const targets = [];
+  // Only near/fine-LOD chunks are geometrically accurate enough to mine —
+  // far coarse chunks are simplified/decimated and don't reflect single
+  // triangles anyway, and mining range is short enough this never matters.
+  for (const entry of chunkEntries.values()) {
+    if (entry.level > 1) continue;
+    targets.push(entry.mesh);
+  }
+  if (!targets.length) return null;
+  const hits = raycaster.intersectObjects(targets, false);
+  for (const hit of hits) {
+    const mainVertCount = hit.object.userData.mainVertCount || 0;
+    if (hit.faceIndex * 3 >= mainVertCount) continue; // skirt triangle, not real terrain
+    return hit;
+  }
+  return null;
+}
+
+// Materials are rounded from the hardness% (mined depth) of the triangle
+// broken — see terrainHardness(). The spec's ranges (soft 0-20%, solid
+// 20-40%, strong 40-60%, sturdy 80-99%) leave 60-80% unlabeled; folded
+// here into "strong" so there's no dead gap a player could mine into.
+function materialTypeForHardness(h) {
+  if (h >= MAX_HARDNESS) return null; // bedrock — unminable
+  if (h < 20) return 'soft';
+  if (h < 40) return 'solid';
+  if (h < 80) return 'strong';
+  return 'sturdy'; // 80-99
+}
+
+const HOTBAR_SIZE = 6;
+const HOTBAR_STACK_MAX = 64;
+const hotbar = new Array(HOTBAR_SIZE).fill(null); // slot: {type, count} | null
+
+function grantToHotbar(type, amount) {
+  if (amount === undefined) amount = 2 + Math.floor(Math.random() * 3); // "a few" per mine: 2-4 (default, single-item grant)
+  // Prefer the matching-type slot with the MOST room, so a run of the same
+  // material spreads across slots instead of maxing one out while other
+  // slots sit empty.
+  let best = -1, bestRoom = -1;
+  for (let i = 0; i < HOTBAR_SIZE; i++) {
+    const slot = hotbar[i];
+    if (slot && slot.type === type && slot.count < HOTBAR_STACK_MAX) {
+      const room = HOTBAR_STACK_MAX - slot.count;
+      if (room > bestRoom) { bestRoom = room; best = i; }
+    }
+  }
+  if (best === -1) {
+    // Free-est: an empty slot first. BUG FIXED: this used to leave
+    // bestRoom at its initial -1 after picking an empty slot, so the
+    // "hotbar completely full" guard below (bestRoom <= 0) treated a
+    // perfectly good empty slot as if it had no room and bailed out
+    // without ever granting anything — which silently discarded every
+    // single mined item forever, since a never-yet-populated slot stays
+    // null (this branch) on every subsequent attempt too. Setting
+    // bestRoom to a real capacity here is the actual fix.
+    for (let i = 0; i < HOTBAR_SIZE; i++) { if (!hotbar[i]) { best = i; bestRoom = HOTBAR_STACK_MAX; break; } }
+    if (best === -1) {
+      bestRoom = -1;
+      for (let i = 0; i < HOTBAR_SIZE; i++) { // else the slot (any type) with the most room
+        const room = HOTBAR_STACK_MAX - hotbar[i].count;
+        if (room > bestRoom) { bestRoom = room; best = i; }
+      }
+    }
+  }
+  if (best === -1 || bestRoom <= 0) return; // hotbar completely full — mined material is lost
+  if (!hotbar[best]) hotbar[best] = { type, count: 0 };
+  hotbar[best].count = Math.min(HOTBAR_STACK_MAX, hotbar[best].count + amount);
+  renderHotbar();
+}
+
+const MATERIAL_COLORS = { soft: '#c9b28a', solid: '#9a9a9a', strong: '#6e6e6e', sturdy: '#7a3030' };
+const hotbarEl = document.getElementById('hotbar');
+const hotbarSlotEls = [];
+for (let i = 0; i < HOTBAR_SIZE; i++) {
+  const el = document.createElement('div');
+  el.className = 'hotslot';
+  hotbarEl.appendChild(el);
+  hotbarSlotEls.push(el);
+}
+function renderHotbar() {
+  for (let i = 0; i < HOTBAR_SIZE; i++) {
+    const slot = hotbar[i], el = hotbarSlotEls[i];
+    el.innerHTML = slot
+      ? `<div class="swatch" style="background:${MATERIAL_COLORS[slot.type]}"></div><div>${slot.count}</div>`
+      : '';
+  }
+}
+
+const miningBarEl = document.getElementById('miningBar');
+const miningBarFillEl = document.getElementById('miningBarFill');
+function setMiningUI(p) {
+  if (p <= 0) { miningBarEl.style.display = 'none'; miningBarFillEl.style.width = '0%'; return; }
+  miningBarEl.style.display = 'block';
+  miningBarFillEl.style.width = (p * 100) + '%';
+}
+
+let miningColKey = null, miningElapsed = 0, miningDuration = 0;
+
+function updateMining(dt) {
+  const hit = (document.pointerLockElement === renderer.domElement && mouseDown) ? pickMiningTarget() : null;
+  if (!hit) {
+    if (miningColKey !== null) { miningColKey = null; miningElapsed = 0; setMiningUI(0); }
+    return;
+  }
+  const hardness = terrainHardness(hit.point.x, hit.point.y, hit.point.z);
+  if (hardness >= MAX_HARDNESS) { // bedrock — can't be mined
+    if (miningColKey !== null) { miningColKey = null; miningElapsed = 0; setMiningUI(0); }
+    return;
+  }
+  const key = mineColKey(hit.point.x, hit.point.z);
+  if (key !== miningColKey) {
+    miningColKey = key;
+    miningElapsed = 0;
+    // 1s base at 0% hardness, scaling as 1/(1 - hardness/100): 2x at 50%,
+    // 4x at 75%, diverging toward infinity as hardness approaches 100%
+    // (bedrock, handled as a hard "unminable" cutoff above rather than an
+    // actually-infinite wait). Divided by MINE_SPEED_MULT so the whole
+    // curve digs proportionally faster while keeping its shape (bedrock
+    // still asymptotes to unminable).
+    miningDuration = (1.0 / (1 - hardness / 100)) / MINE_SPEED_MULT;
+  }
+  miningElapsed += dt;
+  setMiningUI(Math.min(1, miningElapsed / miningDuration));
+  if (miningElapsed >= miningDuration) {
+    completeMine(hit.point.x, hit.point.y, hit.point.z);
+    miningColKey = null; miningElapsed = 0; setMiningUI(0);
+  }
+}
+
+// Carves a sphere of world-space radius MINE_RADIUS out of the terrain,
+// centered on the actual 3D point that was hit (not just its x,z) — this
+// is what makes the dig round instead of a single MINE_STEP-wide flat-
+// bottomed square, and what lets aiming sideways (into the wall of a
+// pit, into a cliff face, or into the wall of an existing tunnel) carve
+// sideways instead of only ever lowering the one column under the
+// crosshair.
+//
+// The dig is a standard SDF/CSG sphere subtraction against the live
+// density field: every lattice point within reach gets
+// min(currentDensity, distanceToCenter - R) written back — negative
+// (air) inside the sphere, completely untouched outside it. Because
+// it's a min(), the same dig naturally does the right thing whether it's
+// eating into untouched rock, widening a crater, or breaking through
+// into a tunnel that's already there: there's no special-casing for "is
+// this the first time this column has been touched" the way the old
+// per-column band-splitting needed. This is also what makes a snaking,
+// spherical tunnel possible in the first place — the sphere doesn't
+// care which direction it's approached from.
+// Carves the MINE_RADIUS sphere centered at (hx,hy,hz) into densityEdits.
+// Pulled out of completeMine() so a no-effect swing (see completeMine()
+// below) can retry the exact same carve re-centered on a nearby point
+// that actually still has material to remove.
+function carveSphereAt(hx, hy, hz) {
+  const R = MINE_RADIUS;
+  const step = DENS_STEP;
+  const span = Math.ceil(R / step) + 1; // +1 lattice-point margin so the sphere's own edge is never clipped
+  const ci = densLatticeIndex(hx), cj = densLatticeIndex(hy), ck = densLatticeIndex(hz);
+  let touchedAny = false, touchedCount = 0, maxDelta = 0;
+
+  // Loop reordered so dj (vertical) is innermost: naturalY/bedrockY below
+  // depend only on the horizontal column (wx,wz from di,dk), not on dj at
+  // all, so hoisting the heightAt() call out of the dj loop turns what
+  // used to be one 5-octave noise evaluation per LATTICE POINT into one
+  // per COLUMN — the same "don't repeat the expensive part per vertical
+  // sample" fix as naturalYs in buildFinePatchChunk, applied here to the
+  // mining swing itself rather than the chunk rebuild that follows it.
+  for (let dk = -span; dk <= span; dk++) {
+    for (let di = -span; di <= span; di++) {
+      const i = ci + di, k = ck + dk;
+      const wx = i * step, wz = k * step;
+      const naturalY = heightAt(wx, wz);
+      const bedrockY = bedrockYFor(naturalY);
+      for (let dj = -span; dj <= span; dj++) {
+        const j = cj + dj;
+        const wy = j * step;
+        const dx = wx - hx, dy = wy - hy, dz = wz - hz;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist > R + step) continue; // outside the sphere (+ a hair of slack) — leave untouched
+
+        if (wy < bedrockY) continue; // bedrock — an absolute floor, never carved
+
+        const key = densKey(i, j, k);
+        const current = densityEdits.has(key) ? densityEdits.get(key) : (naturalY - wy);
+        const carved = dist - R; // this point's signed distance to the dig sphere's own surface
+        const next = Math.min(current, carved);
+        if (next === current) continue; // this dig didn't reach any further than a previous one already did here
+
+        densityEdits.set(key, next);
+        minedColumns.add(i + ',' + k);
+        touchedAny = true; touchedCount++;
+        maxDelta = Math.max(maxDelta, current - next);
+
+        const ckey = level0ChunkKeyFor(wx, wz);
+        const b = minedChunkBounds.get(ckey);
+        if (!b) minedChunkBounds.set(ckey, { minY: wy, maxY: wy });
+        else { if (wy < b.minY) b.minY = wy; if (wy > b.maxY) b.maxY = wy; }
+      }
+    }
+  }
+  return { touchedAny, touchedCount, maxDelta };
+}
+
+// Below this, a dig's effect is too small to read as "mining actually did
+// something" — either it only grazed already-hollow (density <= 0) space,
+// or it shaved a sliver too thin to move the surface a visible amount.
+const MIN_VISIBLE_DENSITY_DELTA = DENS_STEP * 0.25;
+
+// Walks outward from (hx,hy,hz) shell by shell on the density lattice
+// until it finds a lattice point that's still solid (positive density,
+// i.e. real un-carved material, and above bedrock) — used when a mining
+// swing's own sphere had nothing left to remove right where the player
+// aimed. Returns the WORLD coordinates of the nearest such point, or null
+// if nothing solid turned up within maxShells (e.g. aiming into the
+// middle of a very large hollowed-out cavern).
+function findNearestSolidPoint(hx, hy, hz, maxShells) {
+  const step = DENS_STEP;
+  const ci = densLatticeIndex(hx), cj = densLatticeIndex(hy), ck = densLatticeIndex(hz);
+  let best = null, bestDist = Infinity;
+  // Same fix as carveSphereAt: naturalY/bedrockY only depend on the
+  // horizontal column (di,dk), but the shell's "outer surface only"
+  // filter still visits several dj per (di,dk) pair — cache the column
+  // result per shell instead of re-running heightAt()'s 5-octave noise
+  // for each dj. This path only runs on the rare no-effect-swing retry,
+  // so it's a smaller win than carveSphereAt/buildFinePatchChunk, but
+  // just as free.
+  const columnCache = new Map();
+  const columnAt = (di, dk) => {
+    const ckey = di + ',' + dk;
+    let c = columnCache.get(ckey);
+    if (!c) {
+      const wx = (ci + di) * step, wz = (ck + dk) * step;
+      const naturalY = heightAt(wx, wz);
+      c = { wx, wz, naturalY, bedrockY: bedrockYFor(naturalY) };
+      columnCache.set(ckey, c);
+    }
+    return c;
+  };
+  for (let shell = 0; shell <= maxShells; shell++) {
+    columnCache.clear();
+    for (let dk = -shell; dk <= shell; dk++) {
+      for (let dj = -shell; dj <= shell; dj++) {
+        for (let di = -shell; di <= shell; di++) {
+          // Only the OUTER surface of this shell — smaller offsets were
+          // already checked (and would have already returned) at a
+          // previous, smaller shell.
+          if (Math.max(Math.abs(di), Math.abs(dj), Math.abs(dk)) !== shell) continue;
+          const i = ci + di, j = cj + dj, k = ck + dk;
+          const { wx, wz, naturalY, bedrockY } = columnAt(di, dk);
+          const wy = j * step;
+          if (wy < bedrockY) continue; // bedrock — never a valid dig target
+          const key = densKey(i, j, k);
+          const density = densityEdits.has(key) ? densityEdits.get(key) : (naturalY - wy);
+          if (density <= 0) continue; // already air here — not a fix for "mining did nothing"
+          const dist = Math.hypot(wx - hx, wy - hy, wz - hz);
+          if (dist < bestDist) { bestDist = dist; best = { x: wx, y: wy, z: wz }; }
+        }
+      }
+    }
+    if (best) return best; // nearest shell with any hit is close enough — no need to search further out
+  }
+  return best;
+}
+
+function completeMine(hx, hy, hz) {
+  // Depth of the point actually clicked drives the material grant and
+  // mining duration, same as before — hardness is about the natural
+  // surface at the hit point, independent of how the edits are stored.
+  const grantHardness = hardnessAtY(heightAt(hx, hz), hy);
+
+  let { touchedAny, touchedCount, maxDelta } = carveSphereAt(hx, hy, hz);
+  let ix = hx, iy = hy, iz = hz; // where the effective carve landed, for invalidation below
+
+  // BUG FIXED: aiming at ground that's already fully hollowed out (density
+  // already <= 0 everywhere the sphere reaches), or at a spot where the
+  // sphere only shaves a sliver too thin to matter, used to just silently
+  // do nothing — no visible change, no material, and (worse) no feedback
+  // that the swing "landed" at all. Mining should always have SOME
+  // tangible effect on a completed swing: if this carve's own effect was
+  // negligible, retarget it at the nearest still-solid lattice point and
+  // carve there instead, so the action always removes real material.
+  if (!touchedAny || maxDelta < MIN_VISIBLE_DENSITY_DELTA) {
+    const nearest = findNearestSolidPoint(hx, hy, hz, 12);
+    if (nearest) {
+      const retry = carveSphereAt(nearest.x, nearest.y, nearest.z);
+      if (retry.touchedAny && retry.maxDelta > maxDelta) {
+        ({ touchedAny, touchedCount, maxDelta } = retry);
+        ix = nearest.x; iy = nearest.y; iz = nearest.z;
+      }
+    }
+  }
+
+  if (touchedAny) {
+    const type = materialTypeForHardness(grantHardness);
+    // Scales with how much of the sphere actually landed on new (not
+    // already-carved) material, so re-mining the same spot mostly just
+    // opens it up further rather than paying out again and again.
+    if (type) grantToHotbar(type, Math.max(1, Math.round(touchedCount / 6)));
+    invalidateChunksAt(hx, hz, MINE_RADIUS + DENS_STEP * 2);
+    if (ix !== hx || iz !== hz) invalidateChunksAt(ix, iz, MINE_RADIUS + DENS_STEP * 2);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Spawn: place the player atop the guaranteed-tallest mountain (origin)
+// ---------------------------------------------------------------------
+feetX = 0; feetZ = 0.0001; feetY = terrainHeight(feetX, feetZ);
+camera.position.set(feetX, feetY + EYE_HEIGHT, feetZ);
+// Read the slider's actual DOM value rather than hardcoding it: on a fresh
+// load with no prior state it's "2" from the HTML markup (our intended
+// default), but browsers silently restore a previously-set <input> value on
+// reload WITHOUT firing an 'input'/'change' event — by the time this module
+// script runs, that restoration has already happened, so reading it here
+// keeps the game in sync with whatever the slider visually shows.
+setRingRadius(ringSlider.value);
+setViewLevel(slider.value);
+lastCCX = Math.floor(feetX / chunkWorldSize(0));
+lastCCZ = Math.floor(feetZ / chunkWorldSize(0));
+// Belt-and-suspenders: back/forward-cache restores can re-apply a restored
+// value slightly AFTER scripts already ran, again without an event. Re-sync
+// whenever the page is shown from bfcache.
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) { setRingRadius(ringSlider.value); setViewLevel(slider.value); }
+});
+
+// ---------------------------------------------------------------------
+// Resize
+// ---------------------------------------------------------------------
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateProjectionMatrix();
+});
+
+// ---------------------------------------------------------------------
+// Main loop
+// ---------------------------------------------------------------------
+const statsEl = document.getElementById('stats');
+let lastTime = performance.now();
+let fpsAccum = 0, fpsFrames = 0, fpsDisplay = 0, statsTimer = 0;
+
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((now - lastTime) / 1000, 0.1);
+  lastTime = now;
+
+  // Forced first, before movement, mining, queue processing, or render:
+  // whatever chunk the player is currently in (and its near-field ring)
+  // gets built/installed synchronously right here. Nothing else this
+  // frame can run ahead of it.
+  ensureNearFieldImmediate(feetX, feetZ);
+  ensurePlayerFooting();
+
+  updateMovement(dt);
+  updateMining(dt);
+  processQueue();
+  maybeFlushObsolete();
+
+  // Manual clear: reverse-Z requires clearing depth to 0 (not the default 1).
+  const gl = renderer.getContext();
+  gl.clearColor(0, 0, 0, 1);
+  gl.clearDepth(0.0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  renderer.render(scene, camera);
+
+  fpsAccum += dt; fpsFrames++; statsTimer += dt;
+  if (statsTimer > 0.4) {
+    fpsDisplay = Math.round(fpsFrames / fpsAccum);
+    fpsAccum = 0; fpsFrames = 0; statsTimer = 0;
+    statsEl.textContent = `FPS: ${fpsDisplay} | Chunks: ${chunkEntries.size} | Tris: ${Math.round(runningTriCount)}`;
+  }
+}
+requestAnimationFrame(animate);
+
+window.__debug = {
+  completeMine, terrainHeight, terrainHardness, densityEdits, hotbar,
+  mineColKey, getBands, sampleDensity, densityAt, DENS_STEP, MINE_STEP,
+  LAYER_STEP, MAX_HARDNESS, MINE_RADIUS, minedChunkBounds,
+  heightAt, chunkWorldSize,
+  feetX: () => feetX, feetZ: () => feetZ,
+  dumpEdits: () => Array.from(densityEdits.entries()),
+};
+</script>
+</body>
+</html>
