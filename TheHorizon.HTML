@@ -18,6 +18,24 @@
     --text-dim:#3a3a3a; --input-bg:#ffffff; --input-border:#000000;
     --page-bg:#c0c0c0; --link:#0000ee;
   }
+  body.light-mode #ui, body.light-mode #ui *,
+  body.light-mode #coords, body.light-mode #waveCounter,
+  body.light-mode #healthBarLabel, body.light-mode #healthBarText,
+  body.light-mode #playerStatsPanel, body.light-mode #playerStatsPanel *,
+  body.light-mode #hotbar, body.light-mode #hotbar *,
+  body.light-mode #biomeBanner, body.light-mode #devBadge,
+  body.light-mode #inventoryOverlay, body.light-mode #inventoryOverlay *,
+  body.light-mode #craftOverlay, body.light-mode #craftOverlay *,
+  body.light-mode #craftPrompt,
+  body.light-mode #devConsole, body.light-mode #devConsole *,
+  body.light-mode #optionsOverlay, body.light-mode #optionsOverlay *,
+  body.light-mode #paniniWarnOverlay, body.light-mode #paniniWarnOverlay *,
+  body.light-mode #menuOverlay, body.light-mode #menuOverlay *,
+  body.light-mode #waveBtn, body.light-mode #waveLabel,
+  body.light-mode #waveSkipBtn, body.light-mode #waveSkipLabel{
+    text-shadow: -1px -1px 0 rgba(0,0,0,0.6), 1px -1px 0 rgba(0,0,0,0.6),
+                 -1px 1px 0 rgba(0,0,0,0.6), 1px 1px 0 rgba(0,0,0,0.6);
+  }
   
   *{ border-radius:0 !important; }
   #crosshair{ border-radius:50% !important; }
@@ -68,6 +86,16 @@
     border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;
   }
   .optBtn:hover, .toggleBtn:hover{border-color:#ffcf6b;}
+  #cutsceneOverlay{ position:fixed; inset:0; z-index:9999; display:none; pointer-events:none; }
+  #cutsceneFade{ position:absolute; inset:0; background:#000; opacity:0; }
+  #cutsceneText{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:min(900px, 86vw); text-align:center; opacity:0;
+    font-family:'Orbitron', -apple-system, "Segoe UI", Arial, sans-serif;
+    color:#f2f2f2; font-size:28px; letter-spacing:0.5px; line-height:1.5;
+    text-shadow:0 0 10px rgba(0,0,0,0.95), 0 0 22px rgba(0,0,0,0.9), 0 2px 4px rgba(0,0,0,1);
+  }
+  #cutsceneText.title{ font-size:44px; letter-spacing:3px; }
   #optionsOverlay{
     position:fixed; inset:0; z-index:20; display:none;
     align-items:center; justify-content:center;
@@ -138,6 +166,27 @@
     text-shadow:0 1px 2px rgba(0,0,0,0.9);
     z-index:11; user-select:none; pointer-events:none;
   }
+  #playerStatsPanel{
+    position:fixed; right:10px; bottom:16px; z-index:10;
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    font-size:11px; color:#e8e8e8;
+    background:var(--bg); border:2px solid var(--border);
+    border-radius:10px; padding:8px 10px; user-select:none;
+    max-width:230px; max-height:60vh; overflow-y:auto;
+  }
+  #playerStatsPanel .psTitle{
+    font-weight:700; font-size:11.5px; letter-spacing:0.4px;
+    opacity:0.85; margin-bottom:4px; cursor:pointer;
+  }
+  #playerStatsPanel .psRow{
+    display:flex; justify-content:space-between; gap:10px;
+    line-height:1.55; opacity:0.92;
+  }
+  #playerStatsPanel .psRow b{ font-weight:600; }
+  #playerStatsPanel .psBreakdown{
+    font-size:9.5px; opacity:0.6; margin:0 0 4px 8px; line-height:1.4;
+  }
+  #playerStatsPanel.collapsed .psBody{ display:none; }
   #healthBarLabel{
     position:fixed; left:50%; bottom:92px; transform:translateX(-50%);
     font-family: -apple-system, "Segoe UI", Arial, sans-serif;
@@ -213,7 +262,7 @@
   body.menu-active #monsterLayer, body.menu-active #heldItemCanvas, body.menu-active #waveLabel,
   body.menu-active #waveBtn, body.menu-active #waveSkipLabel, body.menu-active #waveSkipBtn,
   body.menu-active #hotbar, body.menu-active #biomeBanner, body.menu-active #devBadge,
-  body.menu-active #ui, body.menu-active #craftPrompt{
+  body.menu-active #ui, body.menu-active #craftPrompt, body.menu-active #playerStatsPanel{
     display:none !important;
   }
   .armorSlot .swatch{ width:26px; height:26px; }
@@ -358,6 +407,15 @@
     border:2px solid var(--border);
     overflow:hidden; pointer-events:none;
   }
+  .hitFx{
+    position:absolute; left:0; top:0;
+    border-radius:50%; border:2px solid #ffffff;
+    pointer-events:none; box-sizing:border-box;
+    transition: transform 0.22s ease-out, opacity 0.22s ease-out;
+    will-change: transform, opacity;
+  }
+  .hitFx.aoe{ border-color:#ff8a3d; border-width:3px; }
+  .hitFx.smash{ border-color:#b34dff; border-width:4px; }
   .monsterBarFill{ height:100%; width:100%; background:#ff5a5a; transition:width 0.12s linear; }
   .monsterBarText{
     position:absolute; left:0; top:0;
@@ -431,6 +489,10 @@
 <div id="healthBarLabel">HEALTH</div>
 <div id="healthBar"><div id="healthBarFill"></div></div>
 <div id="healthBarText"></div>
+<div id="playerStatsPanel">
+  <div class="psTitle" id="psTitle">STATS ▾</div>
+  <div class="psBody" id="psBody"></div>
+</div>
 <div id="monsterLayer"></div>
 <canvas id="heldItemCanvas"></canvas>
 <div id="waveLabel">NO WAVE SENT</div>
@@ -467,6 +529,7 @@
   </div>
 </div></div>
 <div id="craftPrompt">Right-click the crafter to open it</div>
+<div id="cutsceneOverlay"><div id="cutsceneFade"></div><div id="cutsceneText"></div></div>
 <div id="devConsole">
   <div id="devConsoleOutput"></div>
   <div id="devConsoleInputRow">
@@ -831,9 +894,8 @@ const BIOME_WARP_FREQ3 = BASE_FREQ * 1.4;
 const BIOME_WARP_AMOUNT3 = 34;
 const BIOME_WARP_FREQ4 = BASE_FREQ * 4;
 const BIOME_WARP_AMOUNT4 = 14;
+// Runs x,z through 4 layered noise warps before biome lookup, fading out near spawn, so biome borders look organic rather than straight.
 function biomeRaw(x, z) {
-  // Warps x,z through 4 noise octaves before biome lookup, fading near spawn, so biome edges look irregular not a clean contour.
-
   const warpFadeStart = SPAWN_NULLZONE_RADIUS;
   const warpFadeEnd = SPAWN_NULLZONE_RADIUS + SPAWN_BLEND_WIDTH * 3;
   const distFromSpawn = Math.hypot(x, z);
@@ -1770,13 +1832,23 @@ let lastT = 0,
   fpsAccum = 0,
   statsTimer = 0;
 const msgQueue = [];
-const WORKER_MSG_BUDGET_MS = 3;
+// Sized for a healthy ~60fps device where a few ms is a small slice of a
+// 16.6ms frame. On slow hardware frame time balloons but a flat cap doesn't
+// scale with it, so mined/placed chunks end up trickling in at ~1 per
+// visible frame no matter how much frame time is actually available. Scale
+// the budget with the last measured frame interval instead (see
+// lastFrameIntervalMs below), within a floor/ceiling so a single spike can't
+// stall rendering.
+const WORKER_MSG_BUDGET_MS_MIN = 3;
+const WORKER_MSG_BUDGET_MS_MAX = 16;
+let lastFrameIntervalMs = 16.6;
 let fpsCapMs = 0;
 function drainQueue() {
   let n = 0;
   const budgetStart = performance.now();
+  const budgetMs = Math.min(WORKER_MSG_BUDGET_MS_MAX, Math.max(WORKER_MSG_BUDGET_MS_MIN, lastFrameIntervalMs * 0.25));
   while (msgQueue.length) {
-    if (n > 0 && performance.now() - budgetStart > WORKER_MSG_BUDGET_MS) break;
+    if (n > 0 && performance.now() - budgetStart > budgetMs) break;
     const msg = msgQueue.shift();
     n++;
     if (msg.type === 'addChunk') onAddChunk(msg);else if (msg.type === 'removeChunk') rmChunkMesh(msg.key);
@@ -1786,6 +1858,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   if (!renderer) return;
   if (fpsCapMs > 0 && lastT && now - lastT < fpsCapMs) return;
+  const rawIntervalMs = lastT ? Math.min(now - lastT, 100) : 16.6;
+  lastFrameIntervalMs = rawIntervalMs;
   const dt = lastT ? Math.min((now - lastT) / 1000, 0.25) : 0;
   lastT = now;
   drainQueue();
@@ -1967,6 +2041,14 @@ if (__inWorker) {
   window.__renderBridge.addEventListener('worker-in', e => onMsg(e.data));
 }`;
 const RENDER_WORKER_URL = URL.createObjectURL(new Blob([RENDER_WORKER_SRC], {
+  type: 'text/javascript'
+}));
+
+const RENDER_WORKER_SRC_CLASSIC = RENDER_WORKER_SRC.replace(
+  'import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";',
+  'importScripts("https://unpkg.com/three@0.160.0/build/three.min.js");\nconst THREE = self.THREE;'
+);
+const RENDER_WORKER_URL_CLASSIC = URL.createObjectURL(new Blob([RENDER_WORKER_SRC_CLASSIC], {
   type: 'text/javascript'
 }));
 const TERRAIN_WORKER_SRC = String.raw`
@@ -2958,13 +3040,247 @@ function* simplifyMeshGen(verts, tris, boundary, step, targetTriCount, maxError)
     tris: finalTris
   };
 }
+// Plain (non-generator) twin of simplifyMeshGen above. Used by the real-Worker
+// hot path, which runs off the main thread already and never needs to
+// time-slice — draining a generator there just pays per-yield-check overhead
+// on every chunk build for a capability nothing uses. simplifyMeshGen is kept
+// as-is for the main-thread fallback scheduler, which does need to pause.
 function simplifyMesh(verts, tris, boundary, step, targetTriCount, maxError) {
-  const gen = simplifyMeshGen(verts, tris, boundary, step, targetTriCount, maxError);
-  let r;
-  do {
-    r = gen.next();
-  } while (!r.done);
-  return r.value;
+  const nV = boundary.length;
+  const vertAlive = new Uint8Array(nV).fill(1);
+  const vertTris = Array.from({
+    length: nV
+  }, () => new Set());
+  const vertNeighbors = Array.from({
+    length: nV
+  }, () => new Set());
+  const triAlive = new Uint8Array(tris.length).fill(1);
+  const triVerts = tris.map(t => t.slice());
+  const P = vi => [verts[vi * 3], verts[vi * 3 + 1], verts[vi * 3 + 2]];
+  for (let t = 0; t < triVerts.length; t++) {
+    const [a, b, c] = triVerts[t];
+    vertTris[a].add(t);
+    vertTris[b].add(t);
+    vertTris[c].add(t);
+    vertNeighbors[a].add(b);
+    vertNeighbors[a].add(c);
+    vertNeighbors[b].add(a);
+    vertNeighbors[b].add(c);
+    vertNeighbors[c].add(a);
+    vertNeighbors[c].add(b);
+  }
+  const vertQuadric = Array.from({
+    length: nV
+  }, () => new Float64Array(10));
+  function triQuad(t) {
+    const [a, b, c] = triVerts[t];
+    const [px, py, pz] = P(a),
+      [qx, qy, qz] = P(b),
+      [rx, ry, rz] = P(c);
+    const {
+      nx,
+      ny,
+      nz
+    } = triNormArea(px, py, pz, qx, qy, qz, rx, ry, rz);
+    const d = -(nx * px + ny * py + nz * pz);
+    return quadFromPlane(nx, ny, nz, d);
+  }
+  for (let t = 0; t < triVerts.length; t++) {
+    const K = triQuad(t);
+    const [a, b, c] = triVerts[t];
+    quadAddIP(vertQuadric[a], K);
+    quadAddIP(vertQuadric[b], K);
+    quadAddIP(vertQuadric[c], K);
+  }
+  const cellArea0 = (() => {
+    const [a, b, c] = triVerts[0];
+    const [px, py, pz] = P(a),
+      [qx, qy, qz] = P(b),
+      [rx, ry, rz] = P(c);
+    return triNormArea(px, py, pz, qx, qy, qz, rx, ry, rz).area || 1e-6;
+  })();
+  const minTriArea = cellArea0 * QEM_MIN_AREA_FRACTION;
+  const angleEasy = QEM_ANGLE_EASY_DEG * Math.PI / 180;
+  const angleProtect = QEM_ANGLE_PROTECT_DEG * Math.PI / 180;
+  const maxDisplacement = step * QEM_MAX_DISPLACEMENT_STEPS;
+  function evalEdge(v1, v2) {
+    if (!vertAlive[v1] || !vertAlive[v2]) return null;
+    if (boundary[v1] || boundary[v2]) return null;
+    if (!vertNeighbors[v1].has(v2)) return null;
+    const removedTris = [];
+    const apexes = [];
+    for (const t of vertTris[v1]) {
+      if (!triAlive[t]) continue;
+      const tv = triVerts[t];
+      if (tv.includes(v2)) {
+        removedTris.push(t);
+        for (const x of tv) if (x !== v1 && x !== v2) apexes.push(x);
+      }
+    }
+    if (removedTris.length === 0 || removedTris.length > 2) return null;
+    let sharedCount = 0;
+    for (const w of vertNeighbors[v1]) if (vertNeighbors[v2].has(w)) sharedCount++;
+    if (sharedCount !== apexes.length) return null;
+    let angle = 0,
+      hasAngle = false;
+    if (removedTris.length === 2) {
+      const t0 = removedTris[0],
+        t1 = removedTris[1];
+      const [a0, b0, c0] = triVerts[t0];
+      const [p0, q0, r0] = [P(a0), P(b0), P(c0)];
+      const [a1, b1, c1] = triVerts[t1];
+      const [p1, q1, r1] = [P(a1), P(b1), P(c1)];
+      const n0 = triNormArea(...p0, ...q0, ...r0);
+      const n1 = triNormArea(...p1, ...q1, ...r1);
+      const dot = Math.max(-1, Math.min(1, n0.nx * n1.nx + n0.ny * n1.ny + n0.nz * n1.nz));
+      angle = Math.acos(dot);
+      hasAngle = true;
+    }
+    const Q = quadAdd(vertQuadric[v1], vertQuadric[v2]);
+    const [x1, y1, z1] = P(v1),
+      [x2, y2, z2] = P(v2);
+    const midx = (x1 + x2) / 2,
+      midy = (y1 + y2) / 2,
+      midz = (z1 + z2) / 2;
+    const candidates = [{
+      x: x1,
+      y: y1,
+      z: z1
+    }, {
+      x: x2,
+      y: y2,
+      z: z2
+    }, {
+      x: midx,
+      y: midy,
+      z: midz
+    }];
+    const solved = quadOptPos(Q);
+    if (solved) {
+      const horizDisp = Math.hypot(solved.x - midx, solved.z - midz);
+      const vertDisp = Math.abs(solved.y - midy);
+      if (horizDisp <= step * 0.5 && vertDisp <= maxDisplacement) candidates.push(solved);
+    }
+    let best = null,
+      bestErr = Infinity;
+    for (const cand of candidates) {
+      const e = Math.max(0, quadErr(Q, cand.x, cand.y, cand.z));
+      if (e < bestErr) {
+        bestErr = e;
+        best = cand;
+      }
+    }
+    const qemError = bestErr;
+    const px = best.x,
+      py = best.y,
+      pz = best.z;
+    if (hasAngle && angle > angleProtect && qemError > QEM_ANGLE_TINY_ERROR) return null;
+    let worstQuality = 1;
+    const affected = new Set();
+    for (const t of vertTris[v1]) if (triAlive[t] && !removedTris.includes(t)) affected.add(t);
+    for (const t of vertTris[v2]) if (triAlive[t] && !removedTris.includes(t)) affected.add(t);
+    for (const t of affected) {
+      const tv = triVerts[t];
+      const oldP = tv.map(vi => P(vi));
+      const newP = tv.map(vi => vi === v1 || vi === v2 ? [px, py, pz] : P(vi));
+      const oldN = triNormArea(...oldP[0], ...oldP[1], ...oldP[2]);
+      const newN = triNormArea(...newP[0], ...newP[1], ...newP[2]);
+      if (newN.area < minTriArea) return null;
+      if (oldN.nx * newN.nx + oldN.ny * newN.ny + oldN.nz * newN.nz < 0) return null;
+      const q = triQual(...newP[0], ...newP[1], ...newP[2]);
+      if (q.quality < QEM_MIN_QUALITY_HARD) return null;
+      if (q.aspect > QEM_MAX_ASPECT_RATIO) return null;
+      worstQuality = Math.min(worstQuality, q.quality);
+    }
+    let qualityPenalty = 1;
+    if (worstQuality < QEM_QUALITY_SOFT_TARGET) qualityPenalty += QEM_QUALITY_PENALTY_K * (QEM_QUALITY_SOFT_TARGET - worstQuality);
+    let anglePenalty = 1;
+    if (hasAngle && angle > angleEasy) {
+      const t = Math.min(1, (angle - angleEasy) / Math.max(1e-6, angleProtect - angleEasy));
+      anglePenalty += 8 * t;
+    }
+    const cost = qemError * qualityPenalty * anglePenalty + 1e-12;
+    return {
+      cost,
+      qemError,
+      x: px,
+      y: py,
+      z: pz,
+      removedTris
+    };
+  }
+  const heap = new CollapseHeap();
+  const seen = new Set();
+  for (let v1 = 0; v1 < nV; v1++) {
+    if (boundary[v1]) continue;
+    for (const v2 of vertNeighbors[v1]) {
+      if (v2 < v1) continue;
+      const key = v1 + '_' + v2;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const ev = evalEdge(v1, v2);
+      if (ev) heap.push({
+        cost: ev.cost,
+        v1,
+        v2
+      });
+    }
+  }
+  let aliveTriCount = triVerts.length;
+  while (aliveTriCount > targetTriCount && heap.size > 0) {
+    const item = heap.pop();
+    const ev = evalEdge(item.v1, item.v2);
+    if (!ev) continue;
+    if (Math.abs(ev.cost - item.cost) > 1e-9 * Math.max(1, item.cost)) {
+      heap.push({
+        cost: ev.cost,
+        v1: item.v1,
+        v2: item.v2
+      });
+      continue;
+    }
+    if (ev.qemError > maxError) break;
+    const v1 = item.v1,
+      v2 = item.v2;
+    verts[v1 * 3] = ev.x;
+    verts[v1 * 3 + 1] = ev.y;
+    verts[v1 * 3 + 2] = ev.z;
+    quadAddIP(vertQuadric[v1], vertQuadric[v2]);
+    for (const t of ev.removedTris) {
+      triAlive[t] = 0;
+      for (const vi of triVerts[t]) vertTris[vi].delete(t);
+      aliveTriCount--;
+    }
+    for (const t of Array.from(vertTris[v2])) {
+      if (!triAlive[t]) continue;
+      const tv = triVerts[t];
+      for (let k = 0; k < 3; k++) if (tv[k] === v2) tv[k] = v1;
+      vertTris[v1].add(t);
+    }
+    for (const w of vertNeighbors[v2]) {
+      if (w === v1) continue;
+      vertNeighbors[w].delete(v2);
+      vertNeighbors[w].add(v1);
+      vertNeighbors[v1].add(w);
+    }
+    vertNeighbors[v1].delete(v2);
+    vertAlive[v2] = 0;
+    for (const w of vertNeighbors[v1]) {
+      if (boundary[w]) continue;
+      const ev2 = evalEdge(v1, w);
+      if (ev2) heap.push({
+        cost: ev2.cost,
+        v1,
+        v2: w
+      });
+    }
+  }
+  const finalTris = [];
+  for (let t = 0; t < triVerts.length; t++) if (triAlive[t]) finalTris.push(triVerts[t]);
+  return {
+    verts,
+    tris: finalTris
+  };
 }
 let viewLevel = 9;
 function* buildChunkGen(level, cx, cz) {
@@ -3099,18 +3415,250 @@ function* buildChunkGen(level, cx, cz) {
     mainVertCount: mainCount
   };
 }
+// Plain (non-generator) twin of buildChunkGen above, for the real-Worker hot
+// path — see simplifyMesh/simplifyMeshGen comment above for why. Calls the
+// plain simplifyMesh (not simplifyMeshGen) so no part of this call chain pays
+// generator overhead when it's running off the main thread already.
 function buildChunk(level, cx, cz) {
-  const gen = buildChunkGen(level, cx, cz);
-  let r;
-  do {
-    r = gen.next();
-  } while (!r.done);
-  return r.value;
+  const size = chunkSize(level);
+  const res = RES;
+  const step = size / res;
+  const ox = cx * size,
+    oz = cz * size;
+  const gx = new Float64Array(res + 1);
+  const gz = new Float64Array(res + 1);
+  for (let i = 0; i <= res; i++) gx[i] = ox + i * step;
+  for (let j = 0; j <= res; j++) gz[j] = oz + j * step;
+  const heights = new Float32Array((res + 1) * (res + 1));
+  for (let j = 0; j <= res; j++) {
+    for (let i = 0; i <= res; i++) {
+      heights[j * (res + 1) + i] = terrainH(gx[i], gz[j]);
+    }
+  }
+  const h = (i, j) => heights[j * (res + 1) + i];
+  const vtx = (i, j) => [gx[i], h(i, j), gz[j]];
+  const initialMesh = buildGridMesh(gx, gz, heights, res);
+  const SPAWN_QEM_EXEMPT_RADIUS = SPAWN_NULLZONE_RADIUS + SPAWN_BLEND_WIDTH * 3;
+  const clampChunk = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+  const nearestX = clampChunk(0, ox, ox + size);
+  const nearestZ = clampChunk(0, oz, oz + size);
+  const distChunkToSpawn = Math.hypot(nearestX, nearestZ);
+  const exemptFromQEM = distChunkToSpawn <= SPAWN_QEM_EXEMPT_RADIUS;
+  const qemTarget = exemptFromQEM ? initialMesh.tris.length : qemTargetCount(level, initialMesh.tris.length);
+  const qemMaxError = QEM_MAX_ERROR_BASE * Math.pow(4, level);
+  const simplified = exemptFromQEM ? {
+    verts: initialMesh.verts,
+    tris: initialMesh.tris
+  } : simplifyMesh(initialMesh.verts, initialMesh.tris, initialMesh.boundary, step, qemTarget, qemMaxError);
+  const simVerts = simplified.verts;
+  const simTris = simplified.tris;
+  function simVtx(vi) {
+    return [simVerts[vi * 3], simVerts[vi * 3 + 1], simVerts[vi * 3 + 2]];
+  }
+  const mainPos = [],
+    mainNorm = [],
+    mainCol = [],
+    mainBary = [];
+  const levelFactor = Math.min(level / Math.max(viewLevel - 1, 1), 1);
+  const haze = levelFactor * 0.45;
+  const BARY = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  function emitTri(arr_p, arr_n, arr_c, arr_b, a, b, c) {
+    const abx = b[0] - a[0],
+      aby = b[1] - a[1],
+      abz = b[2] - a[2];
+    const acx = c[0] - a[0],
+      acy = c[1] - a[1],
+      acz = c[2] - a[2];
+    let nx = aby * acz - abz * acy;
+    let ny = abz * acx - abx * acz;
+    let nz = abx * acy - aby * acx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len;
+    ny /= len;
+    nz /= len;
+    let bright = 0.30 + ny * 0.55 + (Math.abs(nx) + Math.abs(nz)) * 0.30;
+    bright = Math.max(0.12, Math.min(1, bright));
+    bright = bright * (1 - haze) + 1.0 * haze;
+    let vi = 0;
+    for (const p of [a, b, c]) {
+      arr_p.push(p[0], p[1], p[2]);
+      arr_n.push(nx, ny, nz);
+      const red = 0;
+      const tint = tintFor(p[0], p[1], p[2]);
+      const tR = bright * tint[0],
+        tG = bright * tint[1],
+        tB = bright * tint[2];
+      arr_c.push(tR * (1 - red) + red, tG * (1 - red * 0.85), tB * (1 - red * 0.85));
+      arr_b.push(BARY[vi][0], BARY[vi][1], BARY[vi][2]);
+      vi++;
+    }
+  }
+  for (const [a, b, c] of simTris) {
+    emitTri(mainPos, mainNorm, mainCol, mainBary, simVtx(a), simVtx(b), simVtx(c));
+  }
+  const skirtPos = [],
+    skirtNorm = [],
+    skirtCol = [],
+    skirtBary = [];
+  const skirtDepth = SKIRT_DEPTH_BASE * Math.pow(2, level);
+  function addSkirt(getPt) {
+    let prev = getPt(0);
+    for (let k = 1; k <= res; k++) {
+      const cur = getPt(k);
+      const prevLow = [prev[0], prev[1] - skirtDepth, prev[2]];
+      const curLow = [cur[0], cur[1] - skirtDepth, cur[2]];
+      emitTri(skirtPos, skirtNorm, skirtCol, skirtBary, prev, prevLow, cur);
+      emitTri(skirtPos, skirtNorm, skirtCol, skirtBary, cur, prevLow, curLow);
+      prev = cur;
+    }
+  }
+  addSkirt(k => vtx(k, 0));
+  addSkirt(k => vtx(k, res));
+  addSkirt(k => vtx(0, k));
+  addSkirt(k => vtx(res, k));
+  const mainCount = mainPos.length / 3,
+    skirtCount = skirtPos.length / 3;
+  const position = new Float32Array(mainPos.length + skirtPos.length);
+  const normal = new Float32Array(mainNorm.length + skirtNorm.length);
+  const color = new Float32Array(mainCol.length + skirtCol.length);
+  const bary = new Float32Array(mainBary.length + skirtBary.length);
+  position.set(mainPos, 0);
+  position.set(skirtPos, mainPos.length);
+  normal.set(mainNorm, 0);
+  normal.set(skirtNorm, mainNorm.length);
+  color.set(mainCol, 0);
+  color.set(skirtCol, mainCol.length);
+  bary.set(mainBary, 0);
+  bary.set(skirtBary, mainBary.length);
+  const groups = [{
+    start: 0,
+    count: mainCount,
+    materialIndex: 0
+  }, {
+    start: mainCount,
+    count: skirtCount,
+    materialIndex: 1
+  }];
+  return {
+    position,
+    normal,
+    color,
+    barycentric: bary,
+    groups,
+    triCount: (mainPos.length + skirtPos.length) / 9,
+    mainVertCount: mainCount
+  };
 }
 const SN_CORNER = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
 const SN_EDGES = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
 // One vertex per sign changing cell in the density volume, then walks each cell's 12
 // edges to stitch faces between neighbors, building the terrain mesh.
+// Generator form: yields periodically across each of the 3 passes (density
+// sampling, vertex placement, quad stitching) so the fallback main-thread
+// scheduler can actually time-slice this instead of blocking in one shot.
+function* surfaceNetsGen(nx, ny, nz, sample, owned) {
+  const YIELD_EVERY_K = 4;
+  const iLo = owned ? owned.iLo : 0,
+    iHi = owned ? owned.iHi : nx - 1;
+  const kLo = owned ? owned.kLo : 0,
+    kHi = owned ? owned.kHi : nz - 1;
+  const at = (i, j, k) => i + nx * (j + ny * k);
+  const d = new Float32Array(nx * ny * nz);
+  for (let k = 0; k < nz; k++) {
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) d[at(i, j, k)] = sample(i, j, k);
+    if (k % YIELD_EVERY_K === 0) yield;
+  }
+  const cellAt = (i, j, k) => i + (nx - 1) * (j + (ny - 1) * k);
+  const cellVert = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1);
+  const positions = [];
+  const cellIdx = [];
+  for (let k = 0; k < nz - 1; k++) {
+    for (let j = 0; j < ny - 1; j++) {
+      for (let i = 0; i < nx - 1; i++) {
+        let inside = false,
+          outside = false;
+        const cv = new Float32Array(8);
+        for (let c = 0; c < 8; c++) {
+          const [oi, oj, ok] = SN_CORNER[c];
+          const v = d[at(i + oi, j + oj, k + ok)];
+          cv[c] = v;
+          if (v >= 0) inside = true;else outside = true;
+        }
+        if (!(inside && outside)) continue;
+        let sx = 0,
+          sy = 0,
+          sz = 0,
+          count = 0;
+        for (const [a, b] of SN_EDGES) {
+          const va = cv[a],
+            vb = cv[b];
+          if (va >= 0 === vb >= 0) continue;
+          const t = va / (va - vb);
+          const [ai, aj, ak] = SN_CORNER[a],
+            [bi, bj, bk] = SN_CORNER[b];
+          sx += ai + (bi - ai) * t;
+          sy += aj + (bj - aj) * t;
+          sz += ak + (bk - ak) * t;
+          count++;
+        }
+        cellVert[cellAt(i, j, k)] = positions.length / 3;
+        positions.push(i + sx / count, j + sy / count, k + sz / count);
+        cellIdx.push(i, j, k);
+      }
+    }
+    if (k % YIELD_EVERY_K === 0) yield;
+  }
+  const quads = [];
+  function ring(i, j, k, axis) {
+    if (axis === 0) return [[i, j - 1, k - 1], [i, j, k - 1], [i, j, k], [i, j - 1, k]];
+    if (axis === 1) return [[i - 1, j, k], [i, j, k], [i, j, k - 1], [i - 1, j, k - 1]];
+    return [[i - 1, j - 1, k], [i, j - 1, k], [i, j, k], [i - 1, j, k]];
+  }
+  for (let k = 0; k < nz; k++) {
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        for (let axis = 0; axis < 3; axis++) {
+          let ni = i,
+            nj = j,
+            nk = k;
+          if (axis === 0) ni++;else if (axis === 1) nj++;else nk++;
+          if (ni >= nx || nj >= ny || nk >= nz) continue;
+          if (i < iLo || i > iHi || k < kLo || k > kHi) continue;
+          const here = d[at(i, j, k)],
+            there = d[at(ni, nj, nk)];
+          const hereIn = here >= 0;
+          if (hereIn === there >= 0) continue;
+          const cells = ring(i, j, k, axis);
+          let ok = true;
+          const idx = [];
+          for (const [ci, cj, ck] of cells) {
+            if (ci < 0 || cj < 0 || ck < 0 || ci >= nx - 1 || cj >= ny - 1 || ck >= nz - 1) {
+              ok = false;
+              break;
+            }
+            const vi = cellVert[cellAt(ci, cj, ck)];
+            if (vi < 0) {
+              ok = false;
+              break;
+            }
+            idx.push(vi);
+          }
+          if (!ok) continue;
+          quads.push(hereIn ? [idx[0], idx[1], idx[2], idx[3]] : [idx[0], idx[3], idx[2], idx[1]]);
+        }
+      }
+    }
+    if (k % YIELD_EVERY_K === 0) yield;
+  }
+  return {
+    positions,
+    quads,
+    cellIdx
+  };
+}
+// Plain (non-generator) twin of surfaceNetsGen above, for the same reason as
+// simplifyMesh/simplifyMeshGen: the real-Worker hot path never yields, so it
+// shouldn't pay generator/yield-check overhead on every chunk build.
 function surfaceNets(nx, ny, nz, sample, owned) {
   const iLo = owned ? owned.iLo : 0,
     iHi = owned ? owned.iHi : nx - 1;
@@ -3118,7 +3666,9 @@ function surfaceNets(nx, ny, nz, sample, owned) {
     kHi = owned ? owned.kHi : nz - 1;
   const at = (i, j, k) => i + nx * (j + ny * k);
   const d = new Float32Array(nx * ny * nz);
-  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) d[at(i, j, k)] = sample(i, j, k);
+  for (let k = 0; k < nz; k++) {
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) d[at(i, j, k)] = sample(i, j, k);
+  }
   const cellAt = (i, j, k) => i + (nx - 1) * (j + (ny - 1) * k);
   const cellVert = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1);
   const positions = [];
@@ -3206,6 +3756,265 @@ function surfaceNets(nx, ny, nz, sample, owned) {
   };
 }
 const NEAR_FIELD_RADIUS = 1;
+function* buildFinePatchGen(cx, cz) {
+  const size = chunkSize(0);
+  const ox = cx * size,
+    oz = cz * size;
+  const step = DENS_STEP;
+  const PAD = 1;
+  const n = Math.round(size / step);
+  const gx = new Float64Array(n + 1 + 2 * PAD),
+    gz = new Float64Array(n + 1 + 2 * PAD);
+  for (let i = 0; i < gx.length; i++) gx[i] = ox + (i - PAD) * step;
+  for (let k = 0; k < gz.length; k++) gz[k] = oz + (k - PAD) * step;
+  const naturalYs = new Float64Array(gx.length * gz.length);
+  let naturalMinY = Infinity,
+    naturalMaxY = -Infinity;
+  for (let k = 0; k < gz.length; k++) {
+    for (let i = 0; i < gx.length; i++) {
+      const h = heightAt(gx[i], gz[k]);
+      naturalYs[k * gx.length + i] = h;
+      if (h < naturalMinY) naturalMinY = h;
+      if (h > naturalMaxY) naturalMaxY = h;
+    }
+    if (k % 8 === 0) yield;
+  }
+  const natYAt = (i, k) => naturalYs[k * gx.length + i];
+  const SHELL_PAD = step * 3;
+  let minY = naturalMinY - SHELL_PAD,
+    maxY = naturalMaxY + SHELL_PAD;
+  const cxw = ox + size / 2,
+    czw = oz + size / 2;
+  const isTidalChunk = biomeOf(biomeRaw(cxw, czw)) === BIOME.TIDALISE;
+  if (isTidalChunk) {
+    minY -= TIDAL_OVERHANG_MARGIN;
+    maxY += TIDAL_OVERHANG_MARGIN;
+  }
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const b = minedChunkBounds.get(cx + dx + ',' + (cz + dz));
+      if (!b) continue;
+      minY = Math.min(minY, b.minY - step * 2);
+      maxY = Math.max(maxY, b.maxY + step * 2);
+    }
+  }
+  const SAMPLE_BUDGET = 70000;
+  const Y_LATTICE = step * 16;
+  minY = Math.floor(minY / Y_LATTICE) * Y_LATTICE;
+  maxY = Math.ceil(maxY / Y_LATTICE) * Y_LATTICE;
+  let yStep = step;
+  let ny = Math.max(2, Math.round((maxY - minY) / yStep));
+  while (gx.length * gz.length * (ny + 1) > SAMPLE_BUDGET && yStep < step * 16) {
+    yStep *= 2;
+    ny = Math.max(2, Math.round((maxY - minY) / yStep));
+  }
+  const gy = new Float64Array(ny + 1);
+  for (let j = 0; j <= ny; j++) gy[j] = minY + j * yStep;
+  const sample = (i, j, k) => densAt(gx[i], gy[j], gz[k], natYAt(i, k));
+  const owned = {
+    iLo: PAD,
+    iHi: PAD + n - 1,
+    kLo: PAD,
+    kHi: PAD + n - 1
+  };
+  const {
+    positions: vpos,
+    quads: vquads,
+    cellIdx: vcell
+  } = yield* surfaceNetsGen(gx.length, ny + 1, gz.length, sample, owned);
+  const cellOf = idx => [vcell[idx * 3], vcell[idx * 3 + 1], vcell[idx * 3 + 2]];
+  const latI = new Int32Array(gx.length);
+  for (let i = 0; i < gx.length; i++) latI[i] = densIdx(gx[i]);
+  const latJ = new Int32Array(gy.length);
+  for (let j = 0; j < gy.length; j++) latJ[j] = densIdx(gy[j]);
+  const latK = new Int32Array(gz.length);
+  for (let k = 0; k < gz.length; k++) latK[k] = densIdx(gz[k]);
+  function placedAt(ci, cj, ck) {
+    for (const [oi, oj, ok] of SN_CORNER) {
+      const i = ci + oi,
+        j = cj + oj,
+        k = ck + ok;
+      if (sample(i, j, k) < 0) continue;
+      const key = densKey(latI[i], latJ[j], latK[k]);
+      const hardness = placedHardness.get(key);
+      if (hardness !== undefined) return {
+        hardness,
+        biome: placedBiome.get(key)
+      };
+    }
+    return null;
+  }
+  const toWorld = idx => [ox + (vpos[idx * 3] - PAD) * step, minY + vpos[idx * 3 + 1] * yStep, oz + (vpos[idx * 3 + 2] - PAD) * step];
+  const natYFrac = (fi, fk) => {
+    const i0 = Math.max(0, Math.min(gx.length - 1, Math.floor(fi)));
+    const k0 = Math.max(0, Math.min(gz.length - 1, Math.floor(fk)));
+    const i1 = Math.min(gx.length - 1, i0 + 1),
+      k1 = Math.min(gz.length - 1, k0 + 1);
+    const tx = Math.min(1, Math.max(0, fi - i0)),
+      tz = Math.min(1, Math.max(0, fk - k0));
+    const h00 = natYAt(i0, k0),
+      h10 = natYAt(i1, k0);
+    const h01 = natYAt(i0, k1),
+      h11 = natYAt(i1, k1);
+    return h00 * (1 - tx) * (1 - tz) + h10 * tx * (1 - tz) + h01 * (1 - tx) * tz + h11 * tx * tz;
+  };
+  const natYIdx = idx => natYFrac(vpos[idx * 3], vpos[idx * 3 + 2]);
+  const pos = [],
+    nrm = [],
+    col = [],
+    bary = [];
+  const BARY = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const pushVolTri = (p0, p1, p2, ny0, ny1, ny2, c0, c1, c2) => {
+    const ux = p1[0] - p0[0],
+      uy = p1[1] - p0[1],
+      uz = p1[2] - p0[2];
+    const vx = p2[0] - p0[0],
+      vy = p2[1] - p0[1],
+      vz = p2[2] - p0[2];
+    let nX = uy * vz - uz * vy,
+      nY = uz * vx - ux * vz,
+      nZ = ux * vy - uy * vx;
+    const len = Math.hypot(nX, nY, nZ) || 1;
+    nX /= len;
+    nY /= len;
+    nZ /= len;
+    let bright = 0.30 + Math.abs(nY) * 0.55 + (Math.abs(nX) + Math.abs(nZ)) * 0.30;
+    bright = Math.max(0.12, Math.min(1, bright));
+    const NATURAL = [ny0, ny1, ny2];
+    const CELLS = [c0, c1, c2];
+    for (let t = 0; t < 3; t++) {
+      const p = t === 0 ? p0 : t === 1 ? p1 : p2;
+      pos.push(p[0], p[1], p[2]);
+      nrm.push(nX, nY, nZ);
+      const placed = placedAt(CELLS[t][0], CELLS[t][1], CELLS[t][2]);
+      const hardness = placed ? placed.hardness : hardFor(NATURAL[t], p[0], p[1], p[2]);
+      const tint = placed ? placed.biome !== undefined ? BIOME_TINT[placed.biome] : tintAt(p[0], p[2]) : tintFor(p[0], p[1], p[2]);
+      const red = Math.min(1, hardness / 100);
+      const tR = bright * tint[0],
+        tG = bright * tint[1],
+        tB = bright * tint[2];
+      col.push(tR * (1 - red) + red, tG * (1 - red * 0.85), tB * (1 - red * 0.85));
+      bary.push(BARY[t][0], BARY[t][1], BARY[t][2]);
+    }
+  };
+  let __quadN = 0;
+  // Track how many quads use each undirected edge (by local vertex index)
+  // as we go, so we can find the open/boundary edges of this patch's
+  // surface afterward without a second pass over vquads.
+  const edgeInfo = new Map();
+  for (const q of vquads) {
+    const p0 = toWorld(q[0]),
+      p1 = toWorld(q[1]),
+      p2 = toWorld(q[2]),
+      p3 = toWorld(q[3]);
+    const h0 = natYIdx(q[0]),
+      h1 = natYIdx(q[1]),
+      h2 = natYIdx(q[2]),
+      h3 = natYIdx(q[3]);
+    const c0 = cellOf(q[0]),
+      c1 = cellOf(q[1]),
+      c2 = cellOf(q[2]),
+      c3 = cellOf(q[3]);
+    pushVolTri(p0, p1, p2, h0, h1, h2, c0, c1, c2);
+    pushVolTri(p0, p2, p3, h0, h2, h3, c0, c2, c3);
+    for (let e = 0; e < 4; e++) {
+      const a = q[e],
+        b = q[(e + 1) % 4];
+      const key = a < b ? a + '_' + b : b + '_' + a;
+      const rec = edgeInfo.get(key);
+      if (rec) rec.count++;else edgeInfo.set(key, {
+        count: 1,
+        a,
+        b
+      });
+    }
+    if (++__quadN % 1500 === 0) yield;
+  }
+  // Seal every open edge of this patch (an edge used by exactly one quad)
+  // with a vertical skirt wall. Fine patches use a totally different
+  // meshing method (surface nets on a density volume) than the regular
+  // heightfield-grid chunks around them, so their boundary vertices never
+  // land on the same world-space points as a neighboring non-fine chunk's
+  // boundary -- there is no way to make them share vertices directly.
+  // The skirt hides that mismatch the same way buildChunkGen's addSkirt
+  // hides ordinary LOD-level cracks. Depth is generous relative to the
+  // base LOD skirt since this boundary can be a full topology mismatch
+  // rather than just a resolution mismatch.
+  const FINE_SKIRT_DEPTH = SKIRT_DEPTH_BASE * 4;
+  const skirtPos = [],
+    skirtNrm = [],
+    skirtCol = [],
+    skirtBary = [];
+  function pushSkirtTri(p0, p1, p2) {
+    const ux = p1[0] - p0[0],
+      uy = p1[1] - p0[1],
+      uz = p1[2] - p0[2];
+    const vx = p2[0] - p0[0],
+      vy = p2[1] - p0[1],
+      vz = p2[2] - p0[2];
+    let nX = uy * vz - uz * vy,
+      nY = uz * vx - ux * vz,
+      nZ = ux * vy - uy * vx;
+    const len = Math.hypot(nX, nY, nZ) || 1;
+    nX /= len;
+    nY /= len;
+    nZ /= len;
+    let bright = 0.30 + Math.abs(nY) * 0.55 + (Math.abs(nX) + Math.abs(nZ)) * 0.30;
+    bright = Math.max(0.12, Math.min(1, bright));
+    for (let t = 0; t < 3; t++) {
+      const p = t === 0 ? p0 : t === 1 ? p1 : p2;
+      skirtPos.push(p[0], p[1], p[2]);
+      skirtNrm.push(nX, nY, nZ);
+      const tint = tintFor(p[0], p[1], p[2]);
+      skirtCol.push(bright * tint[0], bright * tint[1], bright * tint[2]);
+      skirtBary.push(BARY[t][0], BARY[t][1], BARY[t][2]);
+    }
+  }
+  let __edgeN = 0;
+  for (const rec of edgeInfo.values()) {
+    if (rec.count !== 1) continue;
+    const pa = toWorld(rec.a),
+      pb = toWorld(rec.b);
+    const paLow = [pa[0], pa[1] - FINE_SKIRT_DEPTH, pa[2]];
+    const pbLow = [pb[0], pb[1] - FINE_SKIRT_DEPTH, pb[2]];
+    pushSkirtTri(pa, paLow, pb);
+    pushSkirtTri(pb, paLow, pbLow);
+    if (++__edgeN % 1500 === 0) yield;
+  }
+  const mainCount = pos.length / 3,
+    skirtCount = skirtPos.length / 3;
+  const position = new Float32Array(pos.length + skirtPos.length);
+  const normal = new Float32Array(nrm.length + skirtNrm.length);
+  const color = new Float32Array(col.length + skirtCol.length);
+  const barycentric = new Float32Array(bary.length + skirtBary.length);
+  position.set(pos, 0);
+  position.set(skirtPos, pos.length);
+  normal.set(nrm, 0);
+  normal.set(skirtNrm, nrm.length);
+  color.set(col, 0);
+  color.set(skirtCol, col.length);
+  barycentric.set(bary, 0);
+  barycentric.set(skirtBary, bary.length);
+  return {
+    position,
+    normal,
+    color,
+    barycentric,
+    groups: skirtCount > 0 ? [{
+      start: 0,
+      count: mainCount,
+      materialIndex: 0
+    }, {
+      start: mainCount,
+      count: skirtCount,
+      materialIndex: 1
+    }] : null,
+    triCount: (pos.length + skirtPos.length) / 9,
+    mainVertCount: mainCount
+  };
+}
+// Plain (non-generator) twin of buildFinePatchGen above, for the real-Worker
+// hot path — see simplifyMesh/simplifyMeshGen comment above for why.
 function buildFinePatch(cx, cz) {
   const size = chunkSize(0);
   const ox = cx * size,
@@ -3346,6 +4155,10 @@ function buildFinePatch(cx, cz) {
       bary.push(BARY[t][0], BARY[t][1], BARY[t][2]);
     }
   };
+  // Track how many quads use each undirected edge (by local vertex index)
+  // as we go, so we can find the open/boundary edges of this patch's
+  // surface afterward without a second pass over vquads.
+  const edgeInfo = new Map();
   for (const q of vquads) {
     const p0 = toWorld(q[0]),
       p1 = toWorld(q[1]),
@@ -3361,15 +4174,97 @@ function buildFinePatch(cx, cz) {
       c3 = cellOf(q[3]);
     pushVolTri(p0, p1, p2, h0, h1, h2, c0, c1, c2);
     pushVolTri(p0, p2, p3, h0, h2, h3, c0, c2, c3);
+    for (let e = 0; e < 4; e++) {
+      const a = q[e],
+        b = q[(e + 1) % 4];
+      const key = a < b ? a + '_' + b : b + '_' + a;
+      const rec = edgeInfo.get(key);
+      if (rec) rec.count++;else edgeInfo.set(key, {
+        count: 1,
+        a,
+        b
+      });
+    }
   }
+  // Seal every open edge of this patch (an edge used by exactly one quad)
+  // with a vertical skirt wall. Fine patches use a totally different
+  // meshing method (surface nets on a density volume) than the regular
+  // heightfield-grid chunks around them, so their boundary vertices never
+  // land on the same world-space points as a neighboring non-fine chunk's
+  // boundary -- there is no way to make them share vertices directly.
+  // The skirt hides that mismatch the same way buildChunkGen's addSkirt
+  // hides ordinary LOD-level cracks. Depth is generous relative to the
+  // base LOD skirt since this boundary can be a full topology mismatch
+  // rather than just a resolution mismatch.
+  const FINE_SKIRT_DEPTH = SKIRT_DEPTH_BASE * 4;
+  const skirtPos = [],
+    skirtNrm = [],
+    skirtCol = [],
+    skirtBary = [];
+  function pushSkirtTri(p0, p1, p2) {
+    const ux = p1[0] - p0[0],
+      uy = p1[1] - p0[1],
+      uz = p1[2] - p0[2];
+    const vx = p2[0] - p0[0],
+      vy = p2[1] - p0[1],
+      vz = p2[2] - p0[2];
+    let nX = uy * vz - uz * vy,
+      nY = uz * vx - ux * vz,
+      nZ = ux * vy - uy * vx;
+    const len = Math.hypot(nX, nY, nZ) || 1;
+    nX /= len;
+    nY /= len;
+    nZ /= len;
+    let bright = 0.30 + Math.abs(nY) * 0.55 + (Math.abs(nX) + Math.abs(nZ)) * 0.30;
+    bright = Math.max(0.12, Math.min(1, bright));
+    for (let t = 0; t < 3; t++) {
+      const p = t === 0 ? p0 : t === 1 ? p1 : p2;
+      skirtPos.push(p[0], p[1], p[2]);
+      skirtNrm.push(nX, nY, nZ);
+      const tint = tintFor(p[0], p[1], p[2]);
+      skirtCol.push(bright * tint[0], bright * tint[1], bright * tint[2]);
+      skirtBary.push(BARY[t][0], BARY[t][1], BARY[t][2]);
+    }
+  }
+  for (const rec of edgeInfo.values()) {
+    if (rec.count !== 1) continue;
+    const pa = toWorld(rec.a),
+      pb = toWorld(rec.b);
+    const paLow = [pa[0], pa[1] - FINE_SKIRT_DEPTH, pa[2]];
+    const pbLow = [pb[0], pb[1] - FINE_SKIRT_DEPTH, pb[2]];
+    pushSkirtTri(pa, paLow, pb);
+    pushSkirtTri(pb, paLow, pbLow);
+  }
+  const mainCount = pos.length / 3,
+    skirtCount = skirtPos.length / 3;
+  const position = new Float32Array(pos.length + skirtPos.length);
+  const normal = new Float32Array(nrm.length + skirtNrm.length);
+  const color = new Float32Array(col.length + skirtCol.length);
+  const barycentric = new Float32Array(bary.length + skirtBary.length);
+  position.set(pos, 0);
+  position.set(skirtPos, pos.length);
+  normal.set(nrm, 0);
+  normal.set(skirtNrm, nrm.length);
+  color.set(col, 0);
+  color.set(skirtCol, col.length);
+  barycentric.set(bary, 0);
+  barycentric.set(skirtBary, bary.length);
   return {
-    position: new Float32Array(pos),
-    normal: new Float32Array(nrm),
-    color: new Float32Array(col),
-    barycentric: new Float32Array(bary),
-    groups: null,
-    triCount: pos.length / 9,
-    mainVertCount: pos.length / 3
+    position,
+    normal,
+    color,
+    barycentric,
+    groups: skirtCount > 0 ? [{
+      start: 0,
+      count: mainCount,
+      materialIndex: 0
+    }, {
+      start: mainCount,
+      count: skirtCount,
+      materialIndex: 1
+    }] : null,
+    triCount: (pos.length + skirtPos.length) / 9,
+    mainVertCount: mainCount
   };
 }
 const __inWorker = typeof window === 'undefined';
@@ -3377,10 +4272,12 @@ const emit = __inWorker ? (m, transfer) => postMessage(m, transfer) : m => windo
   data: m
 }));
 const SLICE_MS = 5;
+const FRAME_BUDGET_MS = 16.6;
 class ChunkBuildScheduler {
   constructor(sliceMs) {
     this.sliceMs = sliceMs;
     this.jobs = [];
+    this.installQueue = [];
     this._scheduled = false;
   }
   push(gen, onDone) {
@@ -3393,26 +4290,44 @@ class ChunkBuildScheduler {
   sched() {
     if (this._scheduled) return;
     this._scheduled = true;
-    requestAnimationFrame(() => this.tick());
+    requestAnimationFrame(ts => this.tick(ts));
   }
-  tick() {
+  tick(ts) {
     this._scheduled = false;
-    const deadline = performance.now() + this.sliceMs;
+    const now0 = performance.now();
+    const elapsedThisFrame = typeof ts === 'number' ? Math.max(0, now0 - ts) : 0;
+    const remaining = FRAME_BUDGET_MS - elapsedThisFrame;
+    const adaptiveSlice = Math.max(1, remaining * 0.5);
+    const deadline = now0 + adaptiveSlice;
+    // Keep stepping the front job as long as budget remains, instead of
+    // stopping after a single yield. Previously a break statement here meant
+    // every tick did exactly one yield-step regardless of how much of the
+    // slice was left, so jobs finished far slower than the budget allowed
+    // and then dumped their install cost into one late, spiky frame. Using
+    // the full slice each frame makes jobs finish in fewer, steadier frames.
     while (this.jobs.length && performance.now() < deadline) {
       const job = this.jobs[0];
       const r = job.gen.next();
       if (r.done) {
         this.jobs.shift();
-        job.onDone(r.value);
-      } else {
-        break;
+        this.installQueue.push({
+          onDone: job.onDone,
+          value: r.value
+        });
       }
     }
-    if (this.jobs.length) this.sched();
+    // Install completed chunks (BufferGeometry + BVH build) under the same
+    // per-frame budget, rather than always running them immediately when a
+    // job finishes. That uninterruptible install cost used to land on top
+    // of whatever generation work already happened that frame; now a chunk
+    // that finishes late in an already-busy frame just waits for a frame
+    // with room, instead of stacking its cost on top of that frame's.
+    while (this.installQueue.length && performance.now() < deadline) {
+      const item = this.installQueue.shift();
+      item.onDone(item.value);
+    }
+    if (this.jobs.length || this.installQueue.length) this.sched();
   }
-}
-function* buildJob(fn) {
-  return fn();
 }
 const __chunkScheduler = __inWorker ? null : new ChunkBuildScheduler(SLICE_MS);
 function onMsg(msg) {
@@ -3458,7 +4373,7 @@ function onMsg(msg) {
         if (__inWorker) {
           finishBuild(msg.fine ? buildFinePatch(msg.cx, msg.cz) : buildChunk(msg.level, msg.cx, msg.cz));
         } else {
-          const gen = msg.fine ? buildJob(() => buildFinePatch(msg.cx, msg.cz)) : buildChunkGen(msg.level, msg.cx, msg.cz);
+          const gen = msg.fine ? buildFinePatchGen(msg.cx, msg.cz) : buildChunkGen(msg.level, msg.cx, msg.cz);
           __chunkScheduler.push(gen, finishBuild);
         }
         break;
@@ -3477,8 +4392,18 @@ let terrainWorker = null;
 let usingFallbackTerrain = false;
 let terrainWatchdog = null;
 let sawAnyChunkBuilt = false;
+const pendingInstalls = [];
+const drainInstalls = prof("drainInstalls", function drainInstalls(deadline) {
+  while (pendingInstalls.length && performance.now() < deadline) {
+    onTerrainMsg({
+      data: pendingInstalls.shift()
+    });
+  }
+});
 const wireTerrain = prof("wireTerrain", function wireTerrain(w) {
-  w.onmessage = e => onTerrainMsg(e);
+  w.onmessage = e => {
+    if (e.data && e.data.type === 'chunkBuilt') pendingInstalls.push(e.data);else onTerrainMsg(e);
+  };
   w.onerror = e => {
     dbg(`terrainWorker THREW: ${e.message} @ line ${e.lineno}:${e.colno}`, true);
     e.preventDefault();
@@ -3486,14 +4411,38 @@ const wireTerrain = prof("wireTerrain", function wireTerrain(w) {
   };
   w.onmessageerror = e => dbg('terrainWorker: message could not be cloned/deserialized', true);
 });
-const armWatchdog = prof("armWatchdog", function armWatchdog() {
+let terrainWatchdogRemainingMs = 4000;
+let terrainWatchdogArmedAt = null;
+let terrainWatchdogVisHandler = null;
+const scheduleTerrainWatchdog = prof("scheduleTerrainWatchdog", function scheduleTerrainWatchdog() {
   if (terrainWatchdog || usingFallbackTerrain || sawAnyChunkBuilt) return;
+  if (typeof document !== 'undefined' && document.hidden) return; 
+  terrainWatchdogArmedAt = performance.now();
   terrainWatchdog = setTimeout(() => {
+    terrainWatchdog = null;
     if (!sawAnyChunkBuilt && !usingFallbackTerrain) {
-      dbg('terrainWatchdog fired: no chunkBuilt from terrainWorker within 4s — falling back to main-thread terrain builder', true);
+      dbg('terrainWatchdog fired: no chunkBuilt from terrainWorker within 4s of active (foreground) time — falling back to main-thread terrain builder', true);
       startFallback();
     }
-  }, 4000);
+  }, terrainWatchdogRemainingMs);
+});
+const pauseTerrainWatchdog = prof("pauseTerrainWatchdog", function pauseTerrainWatchdog() {
+  if (!terrainWatchdog) return;
+  const elapsed = performance.now() - terrainWatchdogArmedAt;
+  terrainWatchdogRemainingMs = Math.max(0, terrainWatchdogRemainingMs - elapsed);
+  clearTimeout(terrainWatchdog);
+  terrainWatchdog = null;
+});
+const armWatchdog = prof("armWatchdog", function armWatchdog() {
+  if (terrainWatchdog || usingFallbackTerrain || sawAnyChunkBuilt) return;
+  terrainWatchdogRemainingMs = 4000;
+  if (!terrainWatchdogVisHandler && typeof document !== 'undefined') {
+    terrainWatchdogVisHandler = () => {
+      if (document.hidden) pauseTerrainWatchdog();else scheduleTerrainWatchdog();
+    };
+    document.addEventListener('visibilitychange', terrainWatchdogVisHandler);
+  }
+  scheduleTerrainWatchdog();
 });
 const startFallback = prof("startFallback", function startFallback() {
   if (usingFallbackTerrain) return;
@@ -3501,6 +4450,10 @@ const startFallback = prof("startFallback", function startFallback() {
   if (terrainWatchdog) {
     clearTimeout(terrainWatchdog);
     terrainWatchdog = null;
+  }
+  if (terrainWatchdogVisHandler && typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', terrainWatchdogVisHandler);
+    terrainWatchdogVisHandler = null;
   }
   try {
     terrainWorker.terminate();
@@ -3525,9 +4478,11 @@ const startFallback = prof("startFallback", function startFallback() {
   }
   inFlightBuilds.clear();
   window.__terrainBridge = new EventTarget();
-  window.__terrainBridge.addEventListener('worker-out', e => onTerrainMsg({
-    data: e.data
-  }));
+  window.__terrainBridge.addEventListener('worker-out', e => {
+    if (e.data && e.data.type === 'chunkBuilt') pendingInstalls.push(e.data);else onTerrainMsg({
+      data: e.data
+    });
+  });
   let moduleReady = false;
   const pending = [];
   terrainWorker = {
@@ -3558,9 +4513,7 @@ const startFallback = prof("startFallback", function startFallback() {
     pending.length = 0;
   });
 });
-terrainWorker = new Worker(TERRAIN_WORKER_URL, {
-  type: 'module'
-});
+terrainWorker = new Worker(TERRAIN_WORKER_URL);
 wireTerrain(terrainWorker);
 dbg('terrainWorker constructed');
 let canvas = document.createElement('canvas');
@@ -3602,9 +4555,7 @@ const startRend = prof("startRend", function startRend(useFallback) {
   if (cloudsUI.sync) cloudsUI.sync();
   if (!useFallback) {
     const offscreen = canvas.transferControlToOffscreen();
-    renderWorker = new Worker(RENDER_WORKER_URL, {
-      type: 'module'
-    });
+    renderWorker = new Worker(RENDER_WORKER_URL_CLASSIC);
     renderWorker.onmessage = e => onRenderMsg(e.data);
     renderWorker.onerror = e => {
       dbg(`renderWorker THREW: ${e.message} @ line ${e.lineno}:${e.colno}`, true);
@@ -3650,6 +4601,10 @@ const startRend = prof("startRend", function startRend(useFallback) {
         chunkEntries.forEach((entry, key) => sendChunk(key, entry.mesh, entry.level, entry.fine));
       }
       if (crafterSpawnMsg) renderWorker.postMessage(crafterSpawnMsg);
+      renderWorker.postMessage({
+        type: 'setFov',
+        fovDeg: fov
+      });
       postCam();
       setView(viewLevel);
     });
@@ -3751,7 +4706,7 @@ const VOL_VOXEL_SIZE_DEFAULT = DENS_STEP;
 const chunkEntries = new Map();
 const pendingRemoval = new Set();
 const chunkCache = new Map();
-const CHUNK_CACHE_MAX = 96;
+const CHUNK_CACHE_MAX = 256;
 const dirtyChunks = new Set();
 const chunkEditGen = new Map();
 const inFlightBuilds = new Map();
@@ -3774,6 +4729,11 @@ const cachePut = prof("cachePut", function cachePut(key, entry) {
     chunkCache.delete(oldestKey);
   }
 });
+
+const LOD_DEADBAND_FRACTION = 0.04;
+const _levelAnchorX = [];
+const _levelAnchorZ = [];
+// Recenters each far LOD ring only once the player crosses a per-level deadband, avoiding chunk churn from imperceptible distance changes.
 const neededSet = prof("neededSet", function neededSet(viewLevel, px, pz) {
   const set = new Map();
   let covMinX = 0,
@@ -3782,8 +4742,19 @@ const neededSet = prof("neededSet", function neededSet(viewLevel, px, pz) {
     covMaxZ = 0;
   for (let level = 0; level < viewLevel; level++) {
     const size = chunkSize(level);
-    const ccx = Math.floor(px / size),
-      ccz = Math.floor(pz / size);
+    let ax = _levelAnchorX[level],
+      az = _levelAnchorZ[level];
+    if (level === 0 || ax === undefined) {
+      ax = px;
+      az = pz;
+    } else if (Math.hypot(px - ax, pz - az) > size * LOD_DEADBAND_FRACTION) {
+      ax = px;
+      az = pz;
+    }
+    _levelAnchorX[level] = ax;
+    _levelAnchorZ[level] = az;
+    const ccx = Math.floor(ax / size),
+      ccz = Math.floor(az / size);
     const fineRadius = level === 0 ? Math.min(NEAR_FIELD_RADIUS, RING_RADIUS) : -1;
     for (let dz = -RING_RADIUS; dz <= RING_RADIUS; dz++) {
       for (let dx = -RING_RADIUS; dx <= RING_RADIUS; dx++) {
@@ -4089,6 +5060,10 @@ const onTerrainMsg = prof("onTerrainMsg", function onTerrainMsg(e) {
     clearTimeout(terrainWatchdog);
     terrainWatchdog = null;
   }
+  if (terrainWatchdogVisHandler && typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', terrainWatchdogVisHandler);
+    terrainWatchdogVisHandler = null;
+  }
   if (!__sawFirstChunk) {
     __sawFirstChunk = true;
     dbg(`first chunkBuilt installed: key=${msg.key} tris=${msg.triCount} verts=${msg.position && msg.position.length / 3}`);
@@ -4338,6 +5313,31 @@ const takeDmg = prof("takeDmg", function takeDmg(amount, sourceMonster) {
   if (wasAlive && health <= 0 && typeof onDeath === 'function') onDeath();
 });
 uiHealth();
+
+const BASE_HP_REGEN_PCT_PER_SEC = 0.01; 
+function hpRegenPctPerSec() {
+  let pct = BASE_HP_REGEN_PCT_PER_SEC;
+  if (typeof equipment === 'undefined') return pct;
+  for (const slotName of EQUIP_SLOTS) {
+    const eq = equipment[slotName];
+    if (!eq) continue;
+    if (typeof itemFromType === 'function') {
+      const h = itemFromType(eq.type);
+      if (h && h.stats && h.stats.hpRegenPct) pct += h.stats.hpRegenPct;
+    }
+  }
+  if (typeof isActive === 'function' && isActive() && EVENT_HORIZON_MERGED_STATS.hpRegenPct) {
+    pct += EVENT_HORIZON_MERGED_STATS.hpRegenPct;
+  }
+  return pct;
+}
+const tickHpRegen = prof("tickHpRegen", function tickHpRegen(dt) {
+  const maxHealth = curMaxHp();
+  if (maxHealth === Infinity) return;
+  if (health <= 0 || health >= maxHealth) return;
+  health = Math.min(maxHealth, health + maxHealth * hpRegenPctPerSec() * dt);
+  uiHealth();
+});
 const biomeBanner = document.getElementById('biomeBanner');
 const BIOME_BANNER_INFO = {
   [BIOME.GREENERY]: {
@@ -4489,6 +5489,10 @@ const FOV_MAX_DEG = 360;
 let paniniConfirmed = lsGet('paniniConfirmed', '0') === '1';
 let fov = 75;
 let pendingFov = null;
+const PANINI_THRESHOLD_DEG = 110;
+const PANINI_D_RAMP_MAX_DEG = 170;
+let mainPaniniActive = false;
+let mainPaniniD = 0;
 const applyFov = prof("applyFov", function applyFov(v) {
   fov = Math.max(60, Math.min(FOV_MAX_DEG, Math.round(Number(v) || 75)));
   fovSlider.value = fov;
@@ -4496,6 +5500,11 @@ const applyFov = prof("applyFov", function applyFov(v) {
   fovVal.textContent = fov;
   fovModeTag.textContent = fov > 110 ? ' \u2014 Panini' : '';
   lsSet('fov', fov);
+  camera.fov = Math.min(fov, 178);
+  camera.updateProjectionMatrix();
+  mainPaniniActive = fov > PANINI_THRESHOLD_DEG;
+  const paniniT = Math.min(1, Math.max(0, (fov - PANINI_THRESHOLD_DEG) / (PANINI_D_RAMP_MAX_DEG - PANINI_THRESHOLD_DEG)));
+  mainPaniniD = mainPaniniActive ? paniniT * 0.985 : 0;
   renderWorker.postMessage({
     type: 'setFov',
     fovDeg: fov
@@ -4577,30 +5586,30 @@ let yaw = Math.PI,
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
-  if (e.code === 'Backslash') {
+  if (e.code === 'Backslash' && !cutsceneActive) {
     e.preventDefault();
     toggleConsole();
     return;
   }
   const typingInField = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
-  if (e.code === 'KeyE' && !typingInField) {
+  if (e.code === 'KeyE' && !typingInField && !cutsceneActive) {
     toggleOpts();
   }
   if (e.code === 'Escape' && optionsOpen) {
     toggleOpts(false);
   }
   const digitMatch = /^Digit([1-6])$/.exec(e.code);
-  if (digitMatch && !typingInField) {
+  if (digitMatch && !typingInField && !cutsceneActive) {
     selectedHotbarIndex = Number(digitMatch[1]) - 1;
     rendHotbar();
   }
-  if (e.code === 'KeyG' && !typingInField) {
+  if (e.code === 'KeyG' && !typingInField && !cutsceneActive) {
     toggleInv();
   }
   if (e.code === 'KeyX' && !typingInField && inventoryOpen && hoveredInvIndex !== null) {
     delSlot(hoveredInvIndex);
   }
-  if (e.code === 'KeyN' && !typingInField && !menuOpen && !craftOpen && !inventoryOpen && !optionsOpen && typeof nextWave === 'function') {
+  if (e.code === 'KeyN' && !typingInField && !menuOpen && !craftOpen && !inventoryOpen && !optionsOpen && !cutsceneActive && typeof nextWave === 'function') {
     nextWave();
   }
   if (e.code === 'Space' && !e.repeat && !typingInField) {
@@ -4613,8 +5622,10 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => keys[e.code] = false);
 let mouseDown = false;
 let placeDown = false;
-window.addEventListener('mousedown', e => {
+
+window.addEventListener('pointerdown', e => {
   if (e.target !== canvas) return;
+  if (cutsceneActive) return;
   if (e.button !== 0 && e.button !== 2) return;
   if (document.pointerLockElement !== canvas) canvas.requestPointerLock();
   if (e.button === 2 && document.pointerLockElement === canvas && craftCursor()) {
@@ -4626,7 +5637,7 @@ window.addEventListener('mousedown', e => {
     if (document.pointerLockElement === canvas && atkCursor()) mouseDown = false;
   } else placeDown = true;
 });
-window.addEventListener('mouseup', e => {
+window.addEventListener('pointerup', e => {
   if (e.button === 0) mouseDown = false;else if (e.button === 2) placeDown = false;
 });
 window.addEventListener('contextmenu', e => {
@@ -4654,6 +5665,15 @@ let spaceJustPressed = false;
 let playerVelY = 0;
 let grounded = false;
 let airborneStartY = null;
+
+let __horizonUsedFastFallThisAir = false;
+const FAST_FALL_KEYS = ['ControlLeft', 'ControlRight'];
+const FAST_FALL_SPEED = 40;
+
+const GROUND_SMASH_BASE_RADIUS = 6;
+const GROUND_SMASH_RADIUS_PER_FALL_UNIT = 0.15;
+const GROUND_SMASH_MAX_RADIUS = 20;
+const GROUND_SMASH_FALLBACK_PCT = 0.20;
 let lastCCX = NaN,
   lastCCZ = NaN;
 const _lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -4744,8 +5764,28 @@ const clampCam = prof("clampCam", function clampCam() {
     }
   }
 });
+
+const CAM_CLIP_SKIP_FRAMES = 2;
+const CAM_CLIP_FORCE_DIST = 0.4;
+let _camClipSkipCounter = 0;
+let _lastClampX = camera.position.x,
+  _lastClampZ = camera.position.z;
+// Skips clampCam's wall-sweep raycasts most frames while the camera barely moves, forcing a real check once movement exceeds a safe distance.
+function maybeClampCam() {
+  const dx = camera.position.x - _lastClampX;
+  const dz = camera.position.z - _lastClampZ;
+  const movedFar = dx * dx + dz * dz > CAM_CLIP_FORCE_DIST * CAM_CLIP_FORCE_DIST;
+  if (movedFar || _camClipSkipCounter <= 0) {
+    clampCam();
+    _lastClampX = camera.position.x;
+    _lastClampZ = camera.position.z;
+    _camClipSkipCounter = CAM_CLIP_SKIP_FRAMES;
+  } else {
+    _camClipSkipCounter--;
+  }
+}
 const GROUND_PROBE_OFFSETS = (() => {
-  const RING = 6;
+  const RING = 4;
   const pts = [[0, 0]];
   for (let i = 0; i < RING; i++) {
     const a = i / RING * Math.PI * 2;
@@ -4754,9 +5794,8 @@ const GROUND_PROBE_OFFSETS = (() => {
   return pts;
 })();
 const groundFeet = prof("groundFeet", function groundFeet(x, z, y) {
-  const fallback = groundBelow(x, z, y);
   const targets = rayTargets();
-  if (!targets.length) return fallback;
+  if (!targets.length) return groundBelow(x, z, y);
   let best = -Infinity,
     found = false;
   for (const [ox, oz] of GROUND_PROBE_OFFSETS) {
@@ -4766,7 +5805,7 @@ const groundFeet = prof("groundFeet", function groundFeet(x, z, y) {
       found = true;
     }
   }
-  return found ? best : fallback;
+  return found ? best : groundBelow(x, z, y);
 });
 const STEP_HEIGHT = 0.6;
 const MAX_WALKABLE_SLOPE_Y = 0.55;
@@ -4819,6 +5858,31 @@ const headBlocked = prof("headBlocked", function headBlocked(x, z, landingY) {
     if (b.top > landingY && b.bottom < yHigh) return true;
   }
   return false;
+});
+
+const _eyeClearRaycaster = new THREE.Raycaster();
+const _eyeClearDir = new THREE.Vector3(0, 1, 0);
+const _eyeClearOrigin = new THREE.Vector3();
+// Raycasts straight up from the feet to find real ceiling clearance, since falling skips the headroom check horizontal movement normally relies on.
+const overheadClearance = prof("overheadClearance", function overheadClearance(x, z, feetYNow) {
+  const cap = EYE_HEIGHT + CAM_CLIP_BUFFER;
+  const targets = rayTargets();
+  if (!targets.length) return cap;
+  _eyeClearOrigin.set(x, feetYNow + 0.05, z);
+  _eyeClearRaycaster.set(_eyeClearOrigin, _eyeClearDir);
+  _eyeClearRaycaster.far = cap;
+  const hits = _eyeClearRaycaster.intersectObjects(targets, false);
+  for (const hit of hits) {
+    const mainVertCount = hit.object.userData.mainVertCount || 0;
+    if (hit.faceIndex * 3 >= mainVertCount) continue;
+    return Math.max(0, hit.distance - 0.05);
+  }
+  return cap;
+});
+
+const camEyeY = prof("camEyeY", function camEyeY(x, z, feetYNow) {
+  const clearance = overheadClearance(x, z, feetYNow);
+  return feetYNow + Math.max(0, Math.min(EYE_HEIGHT, clearance - CAM_CLIP_BUFFER));
 });
 const colBlocked = prof("colBlocked", function colBlocked(x, z, feetYNow) {
   const landingY = landingYAt(x, z, feetYNow);
@@ -4882,13 +5946,13 @@ const tickMove = prof("tickMove", function tickMove(dt) {
     const phaseMantle = equipped('gildTop');
     const barbedCrown = equipped('gildMid');
     const predatorsMane = equipped('armorBottom');
+    const gildBottomTier = equipped('gildBottom');
     let gildBottomTargetMult = 1,
       accelPct = null;
     if (gildBottomEquip && gildBottomEquip.type === 'sunshine_breeze') gildBottomTargetMult = 2;else {
-      const gb = equipped('gildBottom');
-      if (gb && gb.stats.speedMult !== undefined) {
-        gildBottomTargetMult = gb.stats.speedMult;
-        accelPct = gb.stats.accelPct;
+      if (gildBottomTier && gildBottomTier.stats.speedMult !== undefined) {
+        gildBottomTargetMult = gildBottomTier.stats.speedMult;
+        accelPct = gildBottomTier.stats.accelPct;
       }
     }
     if (accelPct != null) {
@@ -4909,8 +5973,7 @@ const tickMove = prof("tickMove", function tickMove(dt) {
     if (keys['KeyA']) move.sub(_right);
     if (move.lengthSq() > 0) {
       move.normalize();
-      const gbTier = equipped('gildBottom');
-      if (gbTier && gbTier.stats.turnInvuln && grounded) {
+      if (gildBottomTier && gildBottomTier.stats.turnInvuln && grounded) {
         const dot = move.x * __horizonLastMoveDirX + move.z * __horizonLastMoveDirZ;
         if (dot < -0.3) __horizonTempInvulnUntil = Math.max(__horizonTempInvulnUntil, nowSec() + 0.3);
       }
@@ -4930,21 +5993,30 @@ const tickMove = prof("tickMove", function tickMove(dt) {
     let gravityMult = 1;
     if (maskEquipped) gravityMult = 0.5;else if (phaseMantle && phaseMantle.stats.gravityMult !== undefined) gravityMult = phaseMantle.stats.gravityMult;
     if (__horizonFinalJumpActive) gravityMult *= 0.4;
+
+    const fastFallHeld = !grounded && gravityMult !== 1 && (keys[FAST_FALL_KEYS[0]] || keys[FAST_FALL_KEYS[1]]);
+    if (fastFallHeld) __horizonUsedFastFallThisAir = true;
     playerVelY += GRAVITY * gravityMult * dt;
+    if (fastFallHeld && playerVelY > -FAST_FALL_SPEED) playerVelY = -FAST_FALL_SPEED;
     feetY += playerVelY * dt;
     if (airborneStartY === null || feetY > airborneStartY) airborneStartY = feetY;
     const ground = groundFeet(feetX, feetZ, feetY);
     if (feetY <= ground) {
       const wasAirborne = airborneStartY !== null;
-      const phaseFallImmune = phaseMantle && phaseMantle.stats.fallImmune;
+      const usedFastFall = __horizonUsedFastFallThisAir;
+      const phaseFallImmune = phaseMantle && phaseMantle.stats.fallImmune && !usedFastFall;
+      const wingsFallSafe = wingsEquipped && !usedFastFall;
       if (wasAirborne) {
         const fallDistance = airborneStartY - ground;
-        if (fallDistance > FALL_DAMAGE_FREE_UNITS && !wingsEquipped && !phaseFallImmune) {
+        if (fallDistance > FALL_DAMAGE_FREE_UNITS && !wingsFallSafe && !phaseFallImmune) {
           takeDmg((fallDistance - FALL_DAMAGE_FREE_UNITS) * FALL_DAMAGE_PER_EXTRA_UNIT);
         }
+        if (isActive() && usedFastFall && fallDistance > FALL_DAMAGE_FREE_UNITS) {
+          groundSmash(feetX, feetZ, fallDistance);
+        }
       }
-      const gbTierLand = equipped('gildBottom');
-      if (wasAirborne && gbTierLand && gbTierLand.stats.landBurst) speedBurst(1.3, 1.0);
+      __horizonUsedFastFallThisAir = false;
+      if (wasAirborne && gildBottomTier && gildBottomTier.stats.landBurst) speedBurst(1.3, 1.0);
       if (__horizonFinalJumpActive && barbedCrown) {
         if (barbedCrown.stats.aoeKnockback) {
           for (const m of monsters) {
@@ -4988,8 +6060,8 @@ const tickMove = prof("tickMove", function tickMove(dt) {
     }
     spaceJustPressed = false;
   }
-  camera.position.set(feetX, feetY + EYE_HEIGHT, feetZ);
-  clampCam();
+  camera.position.set(feetX, camEyeY(feetX, feetZ, feetY), feetZ);
+  maybeClampCam();
   coordsEl.textContent = `x: ${feetX.toFixed(1)}   y: ${feetY.toFixed(1)}   z: ${feetZ.toFixed(1)}`;
   const currentBiome = biomeEff(feetX, feetZ);
   if (currentBiome !== lastBiome) {
@@ -5004,8 +6076,6 @@ const tickMove = prof("tickMove", function tickMove(dt) {
     lastCCZ = ccz;
     tickChunks();
   }
-  ensureNear(feetX, feetZ);
-  ensureFooting();
   craftPromptEl.style.display = nearCraft() && !craftOpen && !inventoryOpen && !optionsOpen ? 'block' : 'none';
 });
 const MINE_RANGE = 8;
@@ -5587,8 +6657,31 @@ heldScene.add(heldRimLight);
 let heldMesh = null;
 let heldMeshType = undefined;
 let heldSpinT = Math.random() * 10;
-const buildTriGeo = prof("buildTriGeo", function buildTriGeo(hardness) {
+
+function heldItemCategory(type) {
+  if (typeof type === 'string' && SWORD_STATS[type]) return 'sword';
+  const hItem = itemFromType(type);
+  if (hItem && hItem.item && typeof hItem.item.slot === 'string') {
+    if (hItem.item.slot.indexOf('gild') === 0) return 'gild';
+    if (hItem.item.slot.indexOf('armor') === 0) return 'armor';
+  }
+  return null;
+}
+const buildTriGeo = prof("buildTriGeo", function buildTriGeo(category, hardness) {
   const t = THREE.MathUtils.clamp(hardness / MATERIAL_TIER_HARDNESS.sturdy, 0, 1);
+  if (category === 'gild') {
+    const radius = 1.5 - t * 0.18;
+    return new THREE.IcosahedronGeometry(radius, 0);
+  }
+  if (category === 'armor') {
+    const size = (1.5 - t * 0.18) * 1.55;
+    return new THREE.BoxGeometry(size, size, size);
+  }
+  if (category === 'sword') {
+    const width = 1.55 - t * 0.15;
+    const height = width * 3;
+    return new THREE.ConeGeometry(width * 0.5, height, 4);
+  }
   const radius = 1.5 - t * 0.18;
   const depth = 2.1 + t * 0.7;
   const geo = new THREE.CylinderGeometry(radius * 0.94, radius, depth, 3, 1, false);
@@ -5609,11 +6702,16 @@ const syncHeldMesh = prof("syncHeldMesh", function syncHeldMesh() {
     heldScene.remove(heldMesh);
     heldMesh.geometry.dispose();
     heldMesh.material.dispose();
+    for (const child of heldMesh.children) {
+      child.geometry.dispose();
+      child.material.dispose();
+    }
     heldMesh = null;
   }
   const hardness = MATERIAL_HARDNESS[slot.type] || 0;
   const colorHex = MATERIAL_COLORS[slot.type] || '#ffffff';
-  const geo = buildTriGeo(hardness);
+  const category = heldItemCategory(slot.type);
+  const geo = buildTriGeo(category, hardness);
   const mat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(colorHex),
     roughness: THREE.MathUtils.clamp(1 - hardness / 130, 0.15, 0.95),
@@ -5623,6 +6721,18 @@ const syncHeldMesh = prof("syncHeldMesh", function syncHeldMesh() {
   heldMesh = new THREE.Mesh(geo, mat);
   heldMesh.rotation.set(0.55, 0.8, 0.18);
   heldMesh.position.set(0.35, -0.25, 0);
+  if (category === 'sword') {
+    heldMesh.position.y += 0.55;
+  } else if (category === 'gild') {
+    heldMesh.rotation.x += 0.35;
+    heldMesh.rotation.z += 0.4;
+  }
+  const heldOutline = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.55
+  }));
+  heldMesh.add(heldOutline);
   heldScene.add(heldMesh);
 });
 const resizeHeld = prof("resizeHeld", function resizeHeld() {
@@ -5810,7 +6920,7 @@ const CRAFTING_RECIPES = [{
     type: 'tidalise_sturdy',
     count: 20
   }, {
-    type: 'phase_mantle_normal',
+    type: 'part_5_normal', 
     count: 10
   }],
   output: {
@@ -6083,49 +7193,170 @@ const CRAFTING_RECIPES = [{
   },
   horizonRequiredWave: 3000
 }];
-const ULTRA_WEAPONS = {
+
+const SWORD_STATS = {
   eclipse_tusk: {
-    dmg: 1500,
+    dmg: 10000000,
     pctMaxHp: 0.02
   },
   void_fang: {
-    dmg: 3500,
+    dmg: 3333333,
     pctMaxHp: 0.03
   },
   radiant_edge: {
-    dmg: 10000,
+    dmg: 32000000,
     pctMaxHp: 0.05
   },
   horizon_breaker: {
-    dmg: 25000,
+    dmg: 69420000,
     pctMaxHp: 0.10
-  }
-};
-const BRIDGE_WEAPONS = {
+  },
   rock_sword: {
-    dmgPct: 1.20,
-    dmgDecayStart: 334,
-    dmgDecayEnd: 1000
+
+    dmg: 500,
+
+    dmgPct: 0.360,
+    dmgDecayStart: 50,
+    dmgDecayEnd: 100
   },
   glitch_sword: {
-    dmgPct: 2.10,
-    dmgDecayStart: 917,
-    dmgDecayEnd: 1500
+    dmg: 2000,
+    
+    dmgPct: 0.60,
+    dmgDecayStart: 125,
+    dmgDecayEnd: 300
   },
   tidal_sword: {
-    dmgPct: 0.10,
+    dmg: 10000,
+    dmgPct: 0.30,
     dmgDecayStart: 500,
     dmgDecayEnd: 1500
   },
   rainbonite_sword: {
-    dmgPct: 0.1111,
+    dmg: 50000,
+    dmgPct: 0.4444,
     dmgDecayStart: 1500,
     dmgDecayEnd: 3000
   },
   bane_of_skins: {
-    dmgPct: 0.1538,
+    dmg: 150000,
+    dmgPct: 0.6,
     dmgDecayStart: 3000,
     dmgDecayEnd: 4251
+  },
+  dev_sword: {
+    dmg: Infinity
+  },
+
+  stingerblade_normal: {
+    dmg: 0,
+    dmgPct: 1.1333,
+    dmgDecayStart: 251,
+    dmgDecayEnd: 451,
+    thirdHitMult: 2
+  },
+  stingerblade_deep: {
+    dmg: 0,
+    dmgPct: 0.413,
+    dmgDecayStart: 4251,
+    dmgDecayEnd: 7251,
+    thirdHitMult: 2.25
+  },
+  stingerblade_dark: {
+    dmg: 0,
+    dmgPct: 0.5113,
+    dmgDecayStart: 7251,
+    dmgDecayEnd: 9851,
+    thirdHitMult: 2.5
+  },
+  stingerblade_bright: {
+    dmg: 0,
+    dmgPct: 0.6320,
+    dmgDecayStart: 24251,
+    dmgDecayEnd: 27251,
+    thirdHitMult: 3
+  },
+  stingerblade_blinding: {
+    dmg: 0,
+    dmgPct: 0.1667,
+    dmgDecayStart: 27251,
+    dmgDecayEnd: null,
+    thirdHitMult: 4
+  },
+  mossbound_cleaver_normal: {
+    dmg: 0,
+    dmgPct: 0.6667,
+    dmgDecayStart: 334,
+    dmgDecayEnd: 604,
+    thirdHitMult: 2,
+    resetOnKill: true
+  },
+  mossbound_cleaver_deep: {
+    dmg: 0,
+    dmgPct: 0.3813,
+    dmgDecayStart: 4334,
+    dmgDecayEnd: 7334,
+    thirdHitMult: 2.25,
+    resetOnKill: true
+  },
+  mossbound_cleaver_dark: {
+    dmg: 0,
+    dmgPct: 0.4113,
+    dmgDecayStart: 7334,
+    dmgDecayEnd: 12334,
+    thirdHitMult: 2.5,
+    resetOnKill: true
+  },
+  mossbound_cleaver_bright: {
+    dmg: 0,
+    dmgPct: 0.6320,
+    dmgDecayStart: 24334,
+    dmgDecayEnd: 27334,
+    thirdHitMult: 3,
+    resetOnKill: true
+  },
+  mossbound_cleaver_blinding: {
+    dmg: 0,
+    dmgPct: 0.1667,
+    dmgDecayStart: 27334,
+    dmgDecayEnd: null,
+    thirdHitMult: 4,
+    resetOnKill: true
+  },
+  tuskbreaker_normal: {
+    dmg: 0,
+    dmgPct: 0.3667,
+    dmgDecayStart: 751,
+    dmgDecayEnd: 4751,
+    knockbackPct: 0.20
+  },
+  tuskbreaker_deep: {
+    dmg: 0,
+    dmgPct: 0.2813,
+    dmgDecayStart: 4751,
+    dmgDecayEnd: 7751,
+    knockbackPct: 0.225
+  },
+  tuskbreaker_dark: {
+    dmg: 0,
+    dmgPct: 0.3113,
+    dmgDecayStart: 7751,
+    dmgDecayEnd: 10751,
+    knockbackPct: 0.25
+  },
+  tuskbreaker_bright: {
+    dmg: 0,
+    dmgPct: 0.5320,
+    dmgDecayStart: 24751,
+    dmgDecayEnd: 27751,
+    knockbackPct: 0.30
+  },
+  tuskbreaker_blinding: {
+    dmg: 0,
+    dmgPct: 0.1667,
+    dmgDecayStart: 27751,
+    dmgDecayEnd: null,
+    knockbackPct: 0.40
   }
 };
 const HORIZON_TIER_ORDER = ['normal', 'deep', 'dark', 'bright', 'blinding'];
@@ -6169,36 +7400,37 @@ const HORIZON_ITEMS = [{
     bright: "It's shameless now; the bright display of the Monster's plates just enrage the next wave more.",
     blinding: "At this point, can you even see it? Do you even care? Probably not. Oh well, the end is near anyway."
   },
+
   tiers: {
     normal: {
       requiredWave: 1,
-      effect: '+15 Max HP. 30 sec emergency-save cooldown (an otherwise-lethal hit leaves you at 1 HP).',
+      effect: '+200 Max HP. 30 sec emergency-save cooldown (an otherwise-lethal hit leaves you at 1 HP).',
       stats: {
-        hpBonus: 15,
+        hpBonus: 200,
         saveCooldown: 30
       }
     },
     deep: {
       requiredWave: 4001,
-      effect: '+15 Max HP. 20 sec emergency-save cooldown.',
+      effect: '+240 Max HP. 20 sec emergency-save cooldown.',
       stats: {
-        hpBonus: 15,
+        hpBonus: 240,
         saveCooldown: 20
       }
     },
     dark: {
       requiredWave: 8001,
-      effect: '+25 Max HP. 10 sec emergency-save cooldown.',
+      effect: '+330 Max HP. 10 sec emergency-save cooldown.',
       stats: {
-        hpBonus: 25,
+        hpBonus: 330,
         saveCooldown: 10
       }
     },
     bright: {
       requiredWave: 24001,
-      effect: '+50 Max HP. 5 sec emergency-save cooldown. Triggering the save grants a short speed burst.',
+      effect: '+700 Max HP. 5 sec emergency-save cooldown. Triggering the save grants a short speed burst.',
       stats: {
-        hpBonus: 50,
+        hpBonus: 700,
         saveCooldown: 5,
         saveSpeedBurst: true
       }
@@ -6360,43 +7592,24 @@ const HORIZON_ITEMS = [{
   tiers: {
     normal: {
       requiredWave: 251,
-      effect: '6.7% of target max HP per hit, tapering to 0% by Wave 4,251. Every 3rd hit x2.',
-      stats: {
-        dmgPct: 0.0666,
-        thirdHitMult: 2
-      }
+      effect: '6.7% of target max HP per hit, tapering to 0% by Wave 4,251. Every 3rd hit x2.'
+
     },
     deep: {
       requiredWave: 4251,
-      effect: '8.1% of target max HP per hit, tapering to 0% by Wave 7,251. Every 3rd hit x2.25.',
-      stats: {
-        dmgPct: 0.0813,
-        thirdHitMult: 2.25
-      }
+      effect: '8.1% of target max HP per hit, tapering to 0% by Wave 7,251. Every 3rd hit x2.25.'
     },
     dark: {
       requiredWave: 7251,
-      effect: '11.1% of target max HP per hit, tapering to 0% by Wave 24,251. Every 3rd hit x2.5.',
-      stats: {
-        dmgPct: 0.1113,
-        thirdHitMult: 2.5
-      }
+      effect: '11.1% of target max HP per hit, tapering to 0% by Wave 24,251. Every 3rd hit x2.5.'
     },
     bright: {
       requiredWave: 24251,
-      effect: '23.2% of target max HP per hit, tapering to 0% by Wave 27,251. Every 3rd hit x3.',
-      stats: {
-        dmgPct: 0.2320,
-        thirdHitMult: 3
-      }
+      effect: '23.2% of target max HP per hit, tapering to 0% by Wave 27,251. Every 3rd hit x3.'
     },
     blinding: {
       requiredWave: 27251,
-      effect: '46.7% of target max HP per hit, permanently. Every 3rd hit x4.',
-      stats: {
-        dmgPct: 0.4667,
-        thirdHitMult: 4
-      }
+      effect: '46.7% of target max HP per hit, permanently. Every 3rd hit x4.'
     }
   }
 }, {
@@ -6409,7 +7622,8 @@ const HORIZON_ITEMS = [{
     type: 'greenery_sturdy',
     count: 25
   }],
-  extraInput: tier => ({
+  extraInput: tier => tier === 'normal' ? null : ({
+
     type: `stingerblade_${tier}`,
     count: 1
   }),
@@ -6424,48 +7638,24 @@ const HORIZON_ITEMS = [{
   tiers: {
     normal: {
       requiredWave: 334,
-      effect: '6.7% of target max HP per hit, tapering to 0% by Wave 4,334. Every 3rd hit x2. Kill resets 3rd-hit counter.',
-      stats: {
-        dmgPct: 0.0667,
-        thirdHitMult: 2,
-        resetOnKill: true
-      }
+      effect: '6.7% of target max HP per hit, tapering to 0% by Wave 4,334. Every 3rd hit x2. Kill resets 3rd-hit counter.'
+      
     },
     deep: {
       requiredWave: 4334,
-      effect: '8.1% of target max HP per hit, tapering to 0% by Wave 7,334. Every 3rd hit x2.25. Kill resets 3rd-hit counter.',
-      stats: {
-        dmgPct: 0.0813,
-        thirdHitMult: 2.25,
-        resetOnKill: true
-      }
+      effect: '8.1% of target max HP per hit, tapering to 0% by Wave 7,334. Every 3rd hit x2.25. Kill resets 3rd-hit counter.'
     },
     dark: {
       requiredWave: 7334,
-      effect: '11.1% of target max HP per hit, tapering to 0% by Wave 24,334. Every 3rd hit x2.5. Kill resets 3rd-hit counter.',
-      stats: {
-        dmgPct: 0.1113,
-        thirdHitMult: 2.5,
-        resetOnKill: true
-      }
+      effect: '11.1% of target max HP per hit, tapering to 0% by Wave 24,334. Every 3rd hit x2.5. Kill resets 3rd-hit counter.'
     },
     bright: {
       requiredWave: 24334,
-      effect: '23.2% of target max HP per hit, tapering to 0% by Wave 27,334. Every 3rd hit x3. Kill resets 3rd-hit counter.',
-      stats: {
-        dmgPct: 0.2320,
-        thirdHitMult: 3,
-        resetOnKill: true
-      }
+      effect: '23.2% of target max HP per hit, tapering to 0% by Wave 27,334. Every 3rd hit x3. Kill resets 3rd-hit counter.'
     },
     blinding: {
       requiredWave: 27334,
-      effect: '46.7% of target max HP per hit, permanently. Every 3rd hit x4. Kill resets 3rd-hit counter.',
-      stats: {
-        dmgPct: 0.4667,
-        thirdHitMult: 4,
-        resetOnKill: true
-      }
+      effect: '46.7% of target max HP per hit, permanently. Every 3rd hit x4. Kill resets 3rd-hit counter.'
     }
   }
 }, {
@@ -6738,43 +7928,24 @@ const HORIZON_ITEMS = [{
   tiers: {
     normal: {
       requiredWave: 751,
-      effect: '6.7% of target max HP per hit, tapering to 0% by Wave 4,751. +20% knockback.',
-      stats: {
-        dmgPct: 0.0667,
-        knockbackPct: 0.20
-      }
+      effect: '6.7% of target max HP per hit, tapering to 0% by Wave 4,751. +20% knockback.'
+      
     },
     deep: {
       requiredWave: 4751,
-      effect: '8.1% of target max HP per hit, tapering to 0% by Wave 7,751. +22.5% knockback.',
-      stats: {
-        dmgPct: 0.0813,
-        knockbackPct: 0.225
-      }
+      effect: '8.1% of target max HP per hit, tapering to 0% by Wave 7,751. +22.5% knockback.'
     },
     dark: {
       requiredWave: 7751,
-      effect: '11.1% of target max HP per hit, tapering to 0% by Wave 24,751. +25% knockback.',
-      stats: {
-        dmgPct: 0.1113,
-        knockbackPct: 0.25
-      }
+      effect: '11.1% of target max HP per hit, tapering to 0% by Wave 24,751. +25% knockback.'
     },
     bright: {
       requiredWave: 24751,
-      effect: '23.2% of target max HP per hit, tapering to 0% by Wave 27,751. +30% knockback.',
-      stats: {
-        dmgPct: 0.2320,
-        knockbackPct: 0.30
-      }
+      effect: '23.2% of target max HP per hit, tapering to 0% by Wave 27,751. +30% knockback.'
     },
     blinding: {
       requiredWave: 27751,
-      effect: '46.7% of target max HP per hit, permanently. +40% knockback.',
-      stats: {
-        dmgPct: 0.4667,
-        knockbackPct: 0.40
-      }
+      effect: '46.7% of target max HP per hit, permanently. +40% knockback.'
     }
   }
 }, {
@@ -6927,7 +8098,10 @@ HORIZON_ITEMS.forEach((hItem, hIdx) => {
       type: inp.type,
       count: inp.count
     }));
-    if (hItem.extraInput) inputs.push(hItem.extraInput(tier));
+    if (hItem.extraInput) {
+      const extra = hItem.extraInput(tier);
+      if (extra) inputs.push(extra);
+    }
     inputs.push({
       type: `part_${hItem.bucket}_${tier}`,
       count: hItem.partCount
@@ -6947,6 +8121,8 @@ HORIZON_ITEMS.forEach((hItem, hIdx) => {
         count: 2
       });
     }
+
+    const isWeaponFedIntoGild = (key === 'mossbound_cleaver_blinding' || key === 'tuskbreaker_blinding');
     CRAFTING_RECIPES.push({
       id: key,
       name: displayName,
@@ -6955,7 +8131,7 @@ HORIZON_ITEMS.forEach((hItem, hIdx) => {
       inputs,
       output: {
         type: key,
-        count: 1
+        count: isWeaponFedIntoGild ? 2 : 1
       },
       horizonRequiredWave: t.requiredWave
     });
@@ -6997,7 +8173,7 @@ const SCALED_ARMOR_TIERS = {
       type: 'tidalise_sturdy',
       count: 20
     }, {
-      type: 'phase_mantle_normal',
+      type: 'part_5_normal', 
       count: 10
     }]
   },
@@ -7150,25 +8326,32 @@ function armorItem(type) {
     type
   };
 }
-function wpnDmgPct(wep, wave) {
+// Computes a sword's %-max-HP hit, decaying it by wave progress, halving per skip-level doubling, then reducing further against bosses and superbosses.
+function wpnDmgPct(wep, wave, target) {
   const stats = wep.stats;
   if (!stats || !stats.dmgPct) return 0;
+  let pct;
   if (stats.dmgDecayEnd !== undefined) {
-    if (stats.dmgDecayEnd === null) return stats.dmgPct;
-    if (wave <= stats.dmgDecayStart) return stats.dmgPct;
-    if (wave >= stats.dmgDecayEnd) return 0;
-    return stats.dmgPct * (1 - (wave - stats.dmgDecayStart) / (stats.dmgDecayEnd - stats.dmgDecayStart));
+
+    if (stats.dmgDecayEnd === null) pct = stats.dmgPct;else if (wave <= stats.dmgDecayStart) pct = stats.dmgPct;else if (wave >= stats.dmgDecayEnd) return 0;else pct = stats.dmgPct * (1 - (wave - stats.dmgDecayStart) / (stats.dmgDecayEnd - stats.dmgDecayStart));
+  } else if (!wep.item || wep.tier == null) {
+    pct = stats.dmgPct;
+  } else {
+    const hItem = HORIZON_ITEMS.find(h => h.id === wep.item.id);
+    pct = stats.dmgPct;
+    if (hItem && wep.tier !== 'blinding') {
+      const startWave = hItem.tiers[wep.tier].requiredWave;
+      const nextTierId = HORIZON_TIER_ORDER[HORIZON_TIER_ORDER.indexOf(wep.tier) + 1];
+      const endWave = hItem.tiers[nextTierId].requiredWave;
+      if (wave >= endWave) return 0;
+      if (wave > startWave) pct = stats.dmgPct * (1 - (wave - startWave) / (endWave - startWave));
+    }
   }
-  if (!wep.item || wep.tier == null) return stats.dmgPct;
-  const hItem = HORIZON_ITEMS.find(h => h.id === wep.item.id);
-  if (!hItem) return stats.dmgPct;
-  if (wep.tier === 'blinding') return stats.dmgPct;
-  const startWave = hItem.tiers[wep.tier].requiredWave;
-  const nextTierId = HORIZON_TIER_ORDER[HORIZON_TIER_ORDER.indexOf(wep.tier) + 1];
-  const endWave = hItem.tiers[nextTierId].requiredWave;
-  if (wave <= startWave) return stats.dmgPct;
-  if (wave >= endWave) return 0;
-  return stats.dmgPct * (1 - (wave - startWave) / (endWave - startWave));
+
+  if (typeof waveSkipMult === 'number' && waveSkipMult > 1) pct /= waveSkipMult;
+
+  if (target && target.isSuperboss) pct /= SUPERBOSS_DMG_PCT_DIVISOR;else if (target && target.isBoss) pct /= BOSS_DMG_PCT_DIVISOR;
+  return pct;
 }
 function armorPct(tier, wave) {
   const r = tier.reduce;
@@ -7192,13 +8375,25 @@ function armorMult(wave) {
 }
 const EVENT_HORIZON_MERGE_MIN = new Set(['capPct', 'negateInterval', 'saveCooldown', 'gravityMult', 'immuneInterval']);
 const EVENT_HORIZON_MERGE_SUM = new Set(['hpBonus']);
+
+const SWORD_STATS_MERGE_FIELDS = ['dmgPct', 'thirdHitMult', 'knockbackPct', 'resetOnKill'];
 function mergedStats() {
   const merged = {};
   for (const hItem of HORIZON_ITEMS) {
     const t = hItem.tiers.blinding;
-    if (!t || !t.stats) continue;
-    for (const key in t.stats) {
-      const val = t.stats[key];
+    if (!t) continue;
+
+    const swordStats = SWORD_STATS[`${hItem.id}_blinding`];
+    let stats;
+    if (swordStats) {
+      stats = {};
+      for (const f of SWORD_STATS_MERGE_FIELDS) if (swordStats[f] !== undefined) stats[f] = swordStats[f];
+    } else {
+      stats = t.stats;
+    }
+    if (!stats) continue;
+    for (const key in stats) {
+      const val = stats[key];
       if (!(key in merged)) {
         merged[key] = val;
         continue;
@@ -7239,6 +8434,18 @@ function tickDrain(dt) {
     if (dx * dx + dz * dz <= rangeSq) m.hp -= m.maxHp * EVENT_HORIZON_DRAIN_PCT_PER_SEC * dt;
   }
 }
+
+function groundSmash(x, z, fallDistance) {
+  const radius = Math.min(GROUND_SMASH_MAX_RADIUS, GROUND_SMASH_BASE_RADIUS + fallDistance * GROUND_SMASH_RADIUS_PER_FALL_UNIT);
+  const pct = (EVENT_HORIZON_MERGED_STATS && EVENT_HORIZON_MERGED_STATS.dmgPct) || GROUND_SMASH_FALLBACK_PCT;
+  for (const m of monsters) {
+    if (m.hp <= 0) continue;
+    const dx = m.x - x,
+      dz = m.z - z;
+    if (Math.hypot(dx, dz) <= radius) m.hp -= m.maxHp * pct;
+  }
+  spawnHitFx(x, feetY, z, radius, 'smash');
+}
 function itemFromType(type) {
   if (typeof type !== 'string') return null;
   const m = /^(.+)_(normal|deep|dark|bright|blinding)$/.exec(type);
@@ -7258,7 +8465,7 @@ function equipped(slotName) {
   return eq ? itemFromType(eq.type) : null;
 }
 function wpnInfo(type) {
-  if (typeof type === 'string' && ULTRA_WEAPONS[type]) {
+  if (typeof type === 'string' && SWORD_STATS[type]) {
     return {
       item: {
         id: type,
@@ -7266,19 +8473,7 @@ function wpnInfo(type) {
         slot: null
       },
       tier: null,
-      stats: ULTRA_WEAPONS[type],
-      type
-    };
-  }
-  if (typeof type === 'string' && BRIDGE_WEAPONS[type]) {
-    return {
-      item: {
-        id: type,
-        name: itemName(type),
-        slot: null
-      },
-      tier: null,
-      stats: BRIDGE_WEAPONS[type],
+      stats: SWORD_STATS[type],
       type
     };
   }
@@ -7466,6 +8661,10 @@ const craft = prof("craft", function craft(recipe) {
   rendInv();
   rendCraftDetail();
   if (typeof save === 'function') save();
+  if (recipe.id === 'event_horizon' && typeof runEndgameCutscene === 'function') {
+    if (craftOpen) toggleCraft(false);
+    runEndgameCutscene();
+  }
 });
 function isLocked(r) {
   return r.horizonRequiredWave !== undefined && currentWave <= r.horizonRequiredWave / 2;
@@ -7553,6 +8752,260 @@ const toggleCraft = prof("toggleCraft", function toggleCraft(force) {
 craftOverlayEl.addEventListener('click', e => {
   if (e.target === craftOverlayEl) toggleCraft(false);
 });
+const cutsceneOverlayEl = document.getElementById('cutsceneOverlay');
+const cutsceneFadeEl = document.getElementById('cutsceneFade');
+const cutsceneTextEl = document.getElementById('cutsceneText');
+let cutsceneActive = false;
+let cutsceneAnimators = [];
+let cutX = 0,
+  cutY = 300,
+  cutZ = 0;
+let cutSpinDegS = 0;
+function tickCutsceneAnimators(dt) {
+  if (cutsceneAnimators.length) cutsceneAnimators = cutsceneAnimators.filter(fn => !fn(dt));
+}
+function cutTween(durationS, onUpdate, easing) {
+  const ease = easing || (t => t * t * (3 - 2 * t));
+  if (durationS <= 0) {
+    onUpdate(1);
+    return Promise.resolve();
+  }
+  let elapsed = 0;
+  return new Promise(resolve => {
+    cutsceneAnimators.push(dt => {
+      elapsed += dt;
+      const t = Math.min(1, elapsed / durationS);
+      onUpdate(ease(t));
+      if (t >= 1) {
+        resolve();
+        return true;
+      }
+      return false;
+    });
+  });
+}
+function cutWait(durationS) {
+  return cutTween(durationS, () => {}, t => t);
+}
+function cutFade(color, targetOpacity, durationS) {
+  cutsceneFadeEl.style.background = color;
+  const startOpacity = parseFloat(cutsceneFadeEl.style.opacity || '0');
+  return cutTween(durationS, t => {
+    cutsceneFadeEl.style.opacity = String(startOpacity + (targetOpacity - startOpacity) * t);
+  }, t => t);
+}
+function cutClimb(targetY, durationS) {
+  const startY = Math.max(cutY, 1);
+  const ratio = targetY / startY;
+  return cutTween(durationS, t => {
+    cutY = startY * Math.pow(ratio, t);
+  }, t => t);
+}
+function cutSpinTo(targetDegS, durationS) {
+  const startDegS = cutSpinDegS;
+  return cutTween(durationS, t => {
+    cutSpinDegS = startDegS + (targetDegS - startDegS) * t;
+  }, t => t);
+}
+function cutFovTo(targetFov, durationS) {
+  const startFov = fov;
+  return cutTween(durationS, t => {
+    applyFov(Math.round(startFov + (targetFov - startFov) * t));
+  }, t => t);
+}
+function cutPitchTo(targetPitch, durationS) {
+  const startPitch = pitch;
+  return cutTween(durationS, t => {
+    pitch = startPitch + (targetPitch - startPitch) * t;
+  }, t => t);
+}
+function lineHold(text) {
+  const words = text.trim().split(/\s+/).length;
+  return Math.max(1.0, Math.min(3.6, 0.7 + words * 0.26));
+}
+function linesDuration(lines) {
+  return lines.reduce((sum, t) => sum + 0.8 + lineHold(t), 0);
+}
+async function cutLine(text, extraHoldS) {
+  const fadeS = 0.4;
+  cutsceneTextEl.classList.remove('title');
+  cutsceneTextEl.textContent = text;
+  await cutTween(fadeS, t => {
+    cutsceneTextEl.style.opacity = String(t);
+  });
+  await cutWait(lineHold(text) + (extraHoldS || 0));
+  await cutTween(fadeS, t => {
+    cutsceneTextEl.style.opacity = String(1 - t);
+  });
+}
+async function cutTitle(text, holdS) {
+  const fadeS = 0.6;
+  cutsceneTextEl.classList.add('title');
+  cutsceneTextEl.textContent = text;
+  await cutTween(fadeS, t => {
+    cutsceneTextEl.style.opacity = String(t);
+  });
+  await cutWait(holdS);
+  await cutTween(fadeS, t => {
+    cutsceneTextEl.style.opacity = String(1 - t);
+  });
+  cutsceneTextEl.classList.remove('title');
+}
+function tickCutsceneCamera(dt) {
+  yaw += cutSpinDegS * Math.PI / 180 * dt;
+  _lookEuler.set(pitch, yaw, 0, 'YXZ');
+  camera.quaternion.setFromEuler(_lookEuler);
+  camera.position.set(cutX, cutY, cutZ);
+}
+const tickCutscene = prof("tickCutscene", function tickCutscene(dt) {
+  tickCutsceneAnimators(dt);
+  tickCutsceneCamera(dt);
+  postCam();
+  procQueue();
+  flushObsolete();
+});
+async function runEndgameCutscene() {
+  if (cutsceneActive) return;
+  cutsceneActive = true;
+  if (typeof craftOpen !== 'undefined' && craftOpen) toggleCraft(false);
+  if (typeof devConsoleOpen !== 'undefined' && devConsoleOpen) toggleConsole(false);
+  if (typeof inventoryOpen !== 'undefined' && inventoryOpen) toggleInv();
+  if (typeof optionsOpen !== 'undefined' && optionsOpen) toggleOpts(false);
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+  const origViewLevel = viewLevel;
+  const origFov = fov;
+  const origClouds = cloudsEnabled;
+  const origYaw = yaw;
+  const origPitch = pitch;
+  document.body.classList.add('menu-active');
+  cutsceneOverlayEl.style.display = 'block';
+  cutsceneAnimators = [];
+  cutSpinDegS = 0;
+  cutX = 0;
+  cutY = 300;
+  cutZ = 0;
+  yaw = 0;
+  pitch = 0;
+  cutsceneFadeEl.style.background = '#000';
+  cutsceneFadeEl.style.opacity = '1';
+  cutsceneTextEl.style.opacity = '0';
+  await cutTitle('THE HORIZON', 2.6);
+  await cutLine('You have spent a long time looking.');
+  await cutLine('At first, there was not much to see.');
+  setView(4);
+  cutSpinDegS = 10;
+  await cutFade('#000', 0, 2.6);
+  await cutLine('A small piece of land.');
+  await cutLine('A few colors.');
+  await cutLine('A few creatures that came when the sun went down.');
+  await cutLine('So you built.');
+  await cutLine('You mined.');
+  await cutLine('You fought.');
+  await cutLine('And you looked farther.');
+  setView(6);
+  await cutLine('The world kept giving you more.');
+  await cutLine('More colors.');
+  await cutLine('More creatures.');
+  await cutLine('More nights.');
+  await cutLine('Wave after wave after wave.');
+  await cutLine('You thought you were progressing.');
+  await cutLine("You weren't.");
+  const fovUpLines = ['You were approaching.', 'There was always something beyond the last thing you could see.'];
+  const fovRampUp = cutFovTo(360, linesDuration(fovUpLines));
+  await cutLine(fovUpLines[0]);
+  await cutLine(fovUpLines[1]);
+  await fovRampUp;
+  await cutLine('A distant mountain.');
+  await cutLine('A different biome.');
+  await cutLine('Another night.');
+  await cutLine('Another wave.');
+  await cutLine('Another color.');
+  await cutLine('And beyond all of it\u2014');
+  await cutLine('the Horizon.');
+  cutFovTo(75, 4);
+  const fadeBlackLines = [
+    'You were never told what was there.',
+    'You simply assumed there had to be something.',
+    "There wasn't.",
+    'Not in the way you expected.',
+    'The colors began to change.',
+    'They grew deeper.',
+    'Then darker.'
+  ];
+  const fadeToBlackBG = cutFade('#000', 1, linesDuration(fadeBlackLines));
+  for (const line of fadeBlackLines) await cutLine(line);
+  await fadeToBlackBG;
+  await cutLine('Then brighter.');
+  await cutFade('#000', 0, 2.2);
+  await cutLine('Until brightness itself stopped meaning what it used to.');
+  await cutLine('You reached Blinding.');
+  await cutFade('#fff', 1, 2.2);
+  await cutLine('By then, you could no longer tell whether the light was coming from the world...');
+  await cutLine('or from you.');
+  await cutLine('The things that once hunted you could no longer touch you.');
+  await cutLine('The things that once seemed impossible to kill simply disappeared when you approached them.');
+  await cutFade('#fff', 0, 2.2);
+  await cutLine("You had reached the end of the world's progression.");
+  await cutLine('And still...');
+  await cutLine('you could see farther.');
+  await cutLine('So you made the Event Horizon.');
+  await cutLine('You expected it to be a weapon.');
+  await cutLine('It was not.');
+  await cutLine('It was a window.');
+  await cutLine('For the first time, you could see the whole thing.');
+  const spinUpLines = ['The waves.', 'The colors.', 'The nights.', 'The world.', 'All of it turning.', 'Again.', 'And again.', 'And again.'];
+  const spinRampUp = cutSpinTo(360, linesDuration(spinUpLines));
+  for (const line of spinUpLines) await cutLine(line);
+  await spinRampUp;
+  await Promise.all([cutSpinTo(0, 0.8), cutPitchTo(-Math.PI / 2 + 0.02, 1.0)]);
+  await cutLine('A cycle with no beginning you could find, and no ending you could reach.');
+  await cutLine('You finally understood.');
+  await cutLine('The Horizon was never the edge of the world.');
+  await cutLine('It was the edge of what the world allowed you to see.');
+  await cutLine('And now you can see beyond it.');
+  setView(22);
+  setClouds(false);
+  const climb1 = cutClimb(100000, 9);
+  await cutLine('There is no wall.');
+  await cutLine('No final monster.');
+  await cutLine('No final wave.');
+  await cutLine('Nothing waiting for you at the end.');
+  await cutLine('Only more distance.');
+  await cutLine('More darkness.');
+  await cutFade('#000', 1, 1.8);
+  await cutLine('More light.');
+  await cutFade('#000', 0, 1.8);
+  await climb1;
+  await cutLine('More world.');
+  const climb2 = cutClimb(10000000, 6);
+  await cutLine('You have spent your entire journey trying to reach the place where everything ends.');
+  await climb2;
+  await cutLine('But nothing ends.');
+  const climb3 = cutClimb(1e12, 7);
+  await cutLine('The cycle continues.');
+  await climb3;
+  await cutFade('#000', 1, 2.6);
+  setView(9);
+  await cutLine('So there is only one thing left to do.');
+  await cutLine('Walk.');
+  await cutLine('Keep looking.');
+  await cutLine('And see how far the world really goes.');
+  await cutLine('The Horizon awaits.');
+  setView(origViewLevel);
+  applyFov(origFov);
+  setClouds(origClouds);
+  yaw = origYaw;
+  pitch = origPitch;
+  camera.position.set(feetX, camEyeY(feetX, feetZ, feetY), feetZ);
+  cutsceneOverlayEl.style.display = 'none';
+  document.body.classList.remove('menu-active');
+  cutsceneActive = false;
+  if (document.pointerLockElement !== canvas) {
+    try {
+      canvas.requestPointerLock();
+    } catch (e) {}
+  }
+}
 const DEV_CHEAT_CODE = 'noclip';
 let devMode = false;
 let devFlySpeedMult = 3;
@@ -7747,6 +9200,9 @@ const runCmd = prof("runCmd", function runCmd(raw) {
     } else {
       runProf(n);
     }
+  } else if (word === 'endgame') {
+    toggleConsole(false);
+    runEndgameCutscene();
   } else if (word === 'perf') {
     if (rest.length === 0) {
       logPerf();
@@ -7820,6 +9276,162 @@ const setMineUI = prof("setMineUI", function setMineUI(p) {
 let miningColKey = null,
   miningElapsed = 0,
   miningDuration = 0;
+
+const TRIANGLE_MINE_SPEED_PER_HARDNESS = 0.003;
+// A held raw triangle's mining speed comes from its material hardness scaled by the inverse of its home biome's terrain mine-speed multiplier.
+function heldTriangleMiningMult(type) {
+  const hardness = MATERIAL_HARDNESS[type];
+  if (hardness === undefined) return 1;
+  const biome = MATERIAL_BIOME[type];
+  const biomeFactor = biome !== undefined && BIOME_MINE_MULT[biome] ? 1 / BIOME_MINE_MULT[biome] : 1;
+  return (1 + hardness * TRIANGLE_MINE_SPEED_PER_HARDNESS) * biomeFactor;
+}
+
+function miningSpeedMult() {
+  let mult = MINE_SPEED_MULT;
+  if (typeof equipment !== 'undefined') {
+    for (const slotName of EQUIP_SLOTS) {
+      const eq = equipment[slotName];
+      if (!eq) continue;
+      if (typeof itemFromType === 'function') {
+        const h = itemFromType(eq.type);
+        if (h && h.stats && h.stats.miningSpeedMult) mult *= h.stats.miningSpeedMult;
+      }
+    }
+  }
+  if (typeof isActive === 'function' && isActive() && EVENT_HORIZON_MERGED_STATS.miningSpeedMult) {
+    mult *= EVENT_HORIZON_MERGED_STATS.miningSpeedMult;
+  }
+  if (typeof inventory !== 'undefined' && typeof selectedHotbarIndex !== 'undefined') {
+    const heldSlot = inventory[selectedHotbarIndex];
+    const held = heldSlot && typeof itemFromType === 'function' ? itemFromType(heldSlot.type) : null;
+    if (held && held.stats && held.stats.miningSpeedMult) mult *= held.stats.miningSpeedMult;
+    else if (heldSlot) mult *= heldTriangleMiningMult(heldSlot.type);
+  }
+  return mult;
+}
+
+function computePlayerStats() {
+  const wave = typeof currentWave === 'number' ? currentWave : 0;
+  const breakdown = { speed: [], gravity: [], jump: [], atk: [], defense: [], miningSpeed: [], hpRegen: [] };
+
+  let speedMult = 1;
+  const gildBottomTier = equipped('gildBottom');
+  if (equipment.gildBottom && equipment.gildBottom.type === 'sunshine_breeze') {
+    speedMult = 2;
+    breakdown.speed.push({ name: itemName('sunshine_breeze'), value: 'x2.00' });
+  } else if (gildBottomTier && gildBottomTier.stats.speedMult !== undefined) {
+    speedMult = gildBottomTier.stats.speedMult;
+    breakdown.speed.push({ name: itemName(equipment.gildBottom.type), value: `x${speedMult.toFixed(2)}` });
+  }
+  const predatorsMane = equipped('armorBottom');
+  if (predatorsMane && predatorsMane.stats.speedBonusPct !== undefined) {
+    breakdown.speed.push({ name: itemName(equipment.armorBottom.type) + ' (sprint)', value: `+${(predatorsMane.stats.speedBonusPct * 100).toFixed(0)}%` });
+  }
+
+  let gravityMult = 1;
+  const maskEquipped = equipment.gildTop && equipment.gildTop.type === 'moonshine_mask';
+  const phaseMantle = equipped('gildTop');
+  if (maskEquipped) {
+    gravityMult = 0.5;
+    breakdown.gravity.push({ name: itemName('moonshine_mask'), value: 'x0.50' });
+  } else if (phaseMantle && phaseMantle.stats.gravityMult !== undefined) {
+    gravityMult = phaseMantle.stats.gravityMult;
+    breakdown.gravity.push({ name: itemName(equipment.gildTop.type), value: `x${gravityMult.toFixed(2)}` });
+  }
+
+  const wingsEquipped = equipment.gildMid && equipment.gildMid.type === 'skyrite_wings';
+  const barbedCrown = equipped('gildMid');
+  const maxJumps = wingsEquipped ? 3 : barbedCrown && barbedCrown.stats.maxJumps !== undefined ? barbedCrown.stats.maxJumps : 1;
+  const jumpHeightMult = maskEquipped ? 2 : 1;
+  if (wingsEquipped) breakdown.jump.push({ name: itemName('skyrite_wings'), value: `${maxJumps} jumps` });else if (barbedCrown && barbedCrown.stats.maxJumps !== undefined) breakdown.jump.push({ name: itemName(equipment.gildMid.type), value: `${maxJumps} jumps` });
+  if (maskEquipped) breakdown.jump.push({ name: itemName('moonshine_mask'), value: 'x2.00 height' });
+
+  const heldSlot = typeof inventory !== 'undefined' ? inventory[selectedHotbarIndex] : null;
+  const ehActive = typeof isActive === 'function' && isActive();
+  const wep = ehActive ? mergedItem() : heldSlot ? wpnInfo(heldSlot.type) : null;
+  const baseAtk = atkDmg();
+
+  let atkBonusPct = 0;
+  for (const slotName of ['armorTop', 'armorMid', 'armorBottom', 'gildTop', 'gildMid', 'gildBottom']) {
+    const eq = equipped(slotName);
+    if (eq && eq.stats && eq.stats.atkBonusPct) {
+      atkBonusPct += eq.stats.atkBonusPct;
+      breakdown.atk.push({ name: itemName(equipment[slotName].type), value: `+${(eq.stats.atkBonusPct * 100).toFixed(0)}%` });
+    }
+  }
+  let weaponPct = 0;
+  if (wep && wep.stats) {
+    if (wep.stats.dmgPct) weaponPct = wpnDmgPct(wep, wave, null);else if (wep.stats.pctMaxHp) weaponPct = wep.stats.pctMaxHp;
+  }
+  if (wep && wep.item) {
+    atkBonusPct += weaponPct;
+    breakdown.atk.push({ name: wep.item.name + (wep.tier ? ` (${HORIZON_TIER_LABEL[wep.tier] || wep.tier})` : ''), value: weaponPct > 0 ? `+${(weaponPct * 100).toFixed(0)}%` : 'equipped weapon' });
+  }
+
+  for (const slotName of ['armorTop', 'armorMid', 'armorBottom']) {
+    const eq = equipment[slotName];
+    if (!eq) continue;
+    const sa = armorItem(eq.type);
+    if (!sa) continue;
+    const pct = armorPct(sa.tier, wave);
+    if (pct > 0) breakdown.defense.push({ name: itemName(eq.type), value: `${(pct * 100).toFixed(1)}%` });
+  }
+  const defensePct = (1 - armorMult(wave)) * 100;
+
+  const mineMult = miningSpeedMult();
+  for (const slotName of EQUIP_SLOTS) {
+    const eq = equipment[slotName];
+    if (!eq) continue;
+    const h = itemFromType(eq.type);
+    if (h && h.stats && h.stats.miningSpeedMult) breakdown.miningSpeed.push({ name: itemName(eq.type), value: `x${h.stats.miningSpeedMult}` });
+  }
+  if (heldSlot) {
+    const heldItem = itemFromType(heldSlot.type);
+    if (heldItem && heldItem.stats && heldItem.stats.miningSpeedMult) breakdown.miningSpeed.push({ name: itemName(heldSlot.type) + ' (held)', value: `x${heldItem.stats.miningSpeedMult}` });
+    else {
+      const triMult = heldTriangleMiningMult(heldSlot.type);
+      if (triMult !== 1) breakdown.miningSpeed.push({ name: itemName(heldSlot.type) + ' (held)', value: `x${triMult.toFixed(3)}` });
+    }
+  }
+
+  const regenPct = hpRegenPctPerSec();
+  for (const slotName of EQUIP_SLOTS) {
+    const eq = equipment[slotName];
+    if (!eq) continue;
+    const h = itemFromType(eq.type);
+    if (h && h.stats && h.stats.hpRegenPct) breakdown.hpRegen.push({ name: itemName(eq.type), value: `+${(h.stats.hpRegenPct * 100).toFixed(2)}%/s` });
+  }
+
+  return {
+    speed: BASE_SPEED * SPRINT_MULT * speedMult,
+    gravity: GRAVITY * gravityMult,
+    jumpHeightMult,
+    maxJumps,
+    baseAtk,
+    atkBonusPct,
+    defensePct,
+    miningSpeedMult: mineMult,
+    hpRegenPctPerSec: regenPct,
+    breakdown
+  };
+}
+let psCollapsed = false;
+const psTitleEl = document.getElementById('psTitle');
+const psBodyEl = document.getElementById('psBody');
+if (psTitleEl) psTitleEl.addEventListener('click', () => {
+  psCollapsed = !psCollapsed;
+  document.getElementById('playerStatsPanel').classList.toggle('collapsed', psCollapsed);
+  psTitleEl.textContent = psCollapsed ? 'STATS \u25b8' : 'STATS \u25be';
+});
+function fmtBreakdown(items) {
+  return items.length ? `<div class="psBreakdown">${items.map(i => `${i.name}: ${i.value}`).join('<br>')}</div>` : '';
+}
+const rendPlayerStats = prof("rendPlayerStats", function rendPlayerStats() {
+  if (!psBodyEl || psCollapsed || typeof equipment === 'undefined') return;
+  const s = computePlayerStats();
+  psBodyEl.innerHTML = `<div class="psRow"><span>Speed</span><b>${s.speed.toFixed(2)}</b></div>` + fmtBreakdown(s.breakdown.speed) + `<div class="psRow"><span>Gravity</span><b>${s.gravity.toFixed(1)}</b></div>` + fmtBreakdown(s.breakdown.gravity) + `<div class="psRow"><span>Jump</span><b>x${s.jumpHeightMult.toFixed(2)} / ${s.maxJumps}x</b></div>` + fmtBreakdown(s.breakdown.jump) + `<div class="psRow"><span>Base Atk</span><b>${s.baseAtk.toFixed(1)}</b></div>` + `<div class="psRow"><span>Atk Bonus</span><b>+${(s.atkBonusPct * 100).toFixed(0)}%</b></div>` + fmtBreakdown(s.breakdown.atk) + `<div class="psRow"><span>Defense</span><b>${s.defensePct.toFixed(1)}%</b></div>` + fmtBreakdown(s.breakdown.defense) + `<div class="psRow"><span>Mining Spd</span><b>x${s.miningSpeedMult.toFixed(2)}</b></div>` + fmtBreakdown(s.breakdown.miningSpeed) + `<div class="psRow"><span>HP Regen</span><b>${(s.hpRegenPctPerSec * 100).toFixed(2)}%/s</b></div>` + fmtBreakdown(s.breakdown.hpRegen);
+});
 const tickMining = prof("tickMining", function tickMining(dt) {
   const hit = document.pointerLockElement === canvas && mouseDown ? pickMine() : null;
   if (!hit) {
@@ -7851,7 +9463,7 @@ const tickMining = prof("tickMining", function tickMining(dt) {
     miningColKey = key;
     miningElapsed = 0;
     const mineBiome = biomeFor(hit.point.x, hit.point.y, hit.point.z);
-    miningDuration = 1.0 / (1 - hardness / 100) / MINE_SPEED_MULT * BIOME_MINE_MULT[mineBiome];
+    miningDuration = 1.0 / (1 - hardness / 100) / miningSpeedMult() * BIOME_MINE_MULT[mineBiome];
   }
   miningElapsed += dt;
   setMineUI(Math.min(1, miningElapsed / miningDuration));
@@ -8093,6 +9705,8 @@ const finishPlace = prof("finishPlace", function finishPlace(px, py, pz) {
   const slot = hotbar[selectedHotbarIndex];
   const type = devMode ? slot ? slot.type : DEV_DEFAULT_MATERIAL : slot && slot.count > 0 ? slot.type : null;
   if (!type) return;
+
+  if (MATERIAL_HARDNESS[type] === undefined) return;
   const {
     touchedAny,
     touchedCount
@@ -8116,6 +9730,7 @@ const MONSTER_SIZE = 1;
 const MONSTER_SPAWN_DIST = 100;
 const MONSTER_SPEED_CAP = 12;
 const MONSTER_ATTACK_RANGE = 1.3;
+const MONSTER_ATTACK_VERTICAL_RANGE = 2.0; 
 const MONSTER_HIT_COOLDOWN = 1.0;
 const MONSTER_KNOCKBACK_DIST = 25;
 const MONSTER_KNOCKBACK_DURATION = 0.6;
@@ -8138,6 +9753,9 @@ const SUPERBOSS_WAVE_INTERVAL = 100,
   SUPERBOSS_STAT_MULT = 8;
 const BOSS_DROP_COUNT = 3,
   SUPERBOSS_DROP_COUNT = 8;
+
+const BOSS_DMG_PCT_DIVISOR = 2,
+  SUPERBOSS_DMG_PCT_DIVISOR = 4;
 const MONSTER_DROP_CHANCE = 0.5;
 function mGroundY(x, z, refY) {
   const dxg = x - feetX,
@@ -8154,9 +9772,11 @@ const PLAYER_CLICK_DAMAGE = 4;
 const TRIANGLE_DAMAGE_PER_HARDNESS = 0.15;
 const TRIANGLE_DAMAGE_PER_RANK = 1.75;
 const MONSTER_ATTACK_SATURATION = 0.85;
-const SWORD_DAMAGE = {
-  dev_sword: Infinity
-};
+
+const SWORD_DAMAGE = {};
+for (const key in SWORD_STATS) {
+  SWORD_DAMAGE[key] = SWORD_STATS[key].dmg;
+}
 const atkDmg = prof("atkDmg", function atkDmg() {
   const slot = inventory[selectedHotbarIndex];
   if (!slot) return PLAYER_CLICK_DAMAGE;
@@ -8455,7 +10075,8 @@ function mobAI(m, dt) {
     return;
   }
   const dx = feetX - m.x,
-    dz = feetZ - m.z;
+    dz = feetZ - m.z,
+    dyAttack = feetY - m.y;
   const dist = Math.sqrt(dx * dx + dz * dz);
   if (m.state === 'eating') {
     m.eatElapsed += dt;
@@ -8473,7 +10094,7 @@ function mobAI(m, dt) {
     }
     return;
   }
-  if (dist <= MONSTER_ATTACK_RANGE) {
+  if (dist <= MONSTER_ATTACK_RANGE && Math.abs(dyAttack) <= MONSTER_ATTACK_VERTICAL_RANGE) {
     if (m.hitCooldown <= 0) {
       takeDmg(m.damage, m);
       m.hitCooldown = MONSTER_HIT_COOLDOWN;
@@ -8632,11 +10253,53 @@ function syncXform() {
   }, [data.buffer]);
 }
 const _monsterProj = new THREE.Vector3();
+const _hpBarRight = new THREE.Vector3();
+const _hpBarUp = new THREE.Vector3();
+const _hpBarFwd = new THREE.Vector3();
+const _hpBarRel = new THREE.Vector3();
+function paniniProjectNdc(localX, localY, localZ, fovDeg, aspect, d) {
+  if (fovDeg <= 180) {
+    if (localZ <= 1e-6) return null;
+    const halfFovVert = THREE.MathUtils.degToRad(Math.min(fovDeg, 179)) * 0.5;
+    const halfFovHoriz = Math.atan(Math.tan(halfFovVert) * aspect);
+    const sEdgeVert = (d + 1) * Math.sin(halfFovVert) / (d + Math.cos(halfFovVert));
+    const sEdgeHoriz = (d + 1) * Math.sin(halfFovHoriz) / (d + Math.cos(halfFovHoriz));
+    const rx = localX / localZ,
+      ry = localY / localZ;
+    const theta = Math.atan(rx);
+    const sx = (d + 1) * Math.sin(theta) / (d + Math.cos(theta));
+    const sy = Math.abs(rx) > 1e-6 ? ry * sx / rx : ry;
+    return {
+      x: sx / sEdgeHoriz,
+      y: sy / sEdgeVert
+    };
+  }
+  const len = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
+  if (len <= 1e-6) return null;
+  const lx = localX / len,
+    ly = localY / len,
+    lz = localZ / len;
+  const halfLonDeg = Math.min(fovDeg, 360) * 0.5;
+  const halfLatDeg = Math.min(fovDeg, 180) * 0.5;
+  const lat = Math.asin(Math.max(-1, Math.min(1, ly)));
+  const lon = Math.atan2(lx, lz);
+  return {
+    x: lon / THREE.MathUtils.degToRad(halfLonDeg),
+    y: lat / THREE.MathUtils.degToRad(halfLatDeg)
+  };
+}
 function syncHpBars() {
   if (!monsters.length) return;
   camera.updateMatrixWorld();
   const w = window.innerWidth,
     h = window.innerHeight;
+  const aspect = w / h;
+  if (mainPaniniActive) {
+    const e = camera.matrixWorld.elements;
+    _hpBarRight.set(e[0], e[1], e[2]);
+    _hpBarUp.set(e[4], e[5], e[6]);
+    _hpBarFwd.set(-e[8], -e[9], -e[10]);
+  }
   for (const m of monsters) {
     const els = monsterBarEls.get(m.id);
     if (!els) continue;
@@ -8650,17 +10313,38 @@ function syncHpBars() {
       }
       continue;
     }
-    _monsterProj.set(m.x, m.y + MONSTER_SIZE * m.sizeMult * 0.75, m.z).project(camera);
-    if (_monsterProj.z > 1 || _monsterProj.z < -1) {
-      if (els.visible) {
-        els.root.style.display = 'none';
-        els.text.style.display = 'none';
-        els.visible = false;
+    let ndcX, ndcY;
+    if (mainPaniniActive) {
+      _hpBarRel.set(m.x, m.y + MONSTER_SIZE * m.sizeMult * 0.75, m.z).sub(camera.position);
+      const localX = _hpBarRel.dot(_hpBarRight),
+        localY = _hpBarRel.dot(_hpBarUp),
+        localZ = _hpBarRel.dot(_hpBarFwd);
+      const ndc = paniniProjectNdc(localX, localY, localZ, fov, aspect, mainPaniniD);
+      if (!ndc) {
+        if (els.visible) {
+          els.root.style.display = 'none';
+          els.text.style.display = 'none';
+          els.visible = false;
+        }
+        continue;
       }
-      continue;
+      ndcX = ndc.x;
+      ndcY = ndc.y;
+    } else {
+      _monsterProj.set(m.x, m.y + MONSTER_SIZE * m.sizeMult * 0.75, m.z).project(camera);
+      if (_monsterProj.z > 1 || _monsterProj.z < -1) {
+        if (els.visible) {
+          els.root.style.display = 'none';
+          els.text.style.display = 'none';
+          els.visible = false;
+        }
+        continue;
+      }
+      ndcX = _monsterProj.x;
+      ndcY = _monsterProj.y;
     }
-    const sx = (_monsterProj.x * 0.5 + 0.5) * w;
-    const sy = (1 - (_monsterProj.y * 0.5 + 0.5)) * h;
+    const sx = (ndcX * 0.5 + 0.5) * w;
+    const sy = (1 - (ndcY * 0.5 + 0.5)) * h;
     if (sx < -60 || sx > w + 60 || sy < -30 || sy > h + 30) {
       if (els.visible) {
         els.root.style.display = 'none';
@@ -8696,10 +10380,69 @@ function syncHpBars() {
     }
   }
 }
+
+const AOE_HIT_FRACTIONS = [1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8, 1 / 9, 1 / 10];
+const AOE_RADIUS_STEP = 0.75; 
+const AOE_MAX_TARGETS = 6;    
+const AOE_FALLOFF = 0.6;      
+function aoeRadiusForFraction(fraction) {
+  let tier = 0;
+  for (const cutoff of AOE_HIT_FRACTIONS) {
+    if (fraction < cutoff) tier++;else break;
+  }
+  return tier * AOE_RADIUS_STEP;
+}
+
+const HIT_FX_POOL_SIZE = 16;
+const _hitFxPool = [];
+const _hitFxVec = new THREE.Vector3();
+for (let __hfi = 0; __hfi < HIT_FX_POOL_SIZE; __hfi++) {
+  const el = document.createElement('div');
+  el.className = 'hitFx';
+  el.style.display = 'none';
+  monsterLayerEl.appendChild(el);
+  _hitFxPool.push({
+    el,
+    busy: false,
+    timer: null
+  });
+}
+function spawnHitFx(x, y, z, radius, variant) {
+  variant = variant || (radius > 0 ? 'aoe' : 'single');
+  _hitFxVec.set(x, y, z).project(camera);
+  if (_hitFxVec.z > 1) return;
+  const slot = _hitFxPool.find(s => !s.busy) || _hitFxPool[0];
+  const w = window.innerWidth,
+    h = window.innerHeight;
+  const sx = (_hitFxVec.x * 0.5 + 0.5) * w;
+  const sy = (1 - (_hitFxVec.y * 0.5 + 0.5)) * h;
+  const pxRadius = variant === 'single' ? 10 : Math.min(220, 24 + radius * 14);
+  slot.busy = true;
+  clearTimeout(slot.timer);
+  slot.el.className = 'hitFx' + (variant !== 'single' ? ' ' + variant : '');
+  slot.el.style.width = pxRadius * 2 + 'px';
+  slot.el.style.height = pxRadius * 2 + 'px';
+  slot.el.style.marginLeft = -pxRadius + 'px';
+  slot.el.style.marginTop = -pxRadius + 'px';
+  slot.el.style.display = 'block';
+  slot.el.style.transition = 'none';
+  slot.el.style.transform = `translate(${sx}px, ${sy}px) scale(0.2)`;
+  slot.el.style.opacity = '0.9';
+  void slot.el.offsetWidth;
+  slot.el.style.transition = '';
+  slot.el.style.transform = `translate(${sx}px, ${sy}px) scale(1)`;
+  slot.el.style.opacity = '0';
+  slot.timer = setTimeout(() => {
+    slot.el.style.display = 'none';
+    slot.busy = false;
+  }, 240);
+}
 const _attackRay = new THREE.Ray();
 const _attackDir = new THREE.Vector3();
 const _attackBox = new THREE.Box3();
 const _attackHit = new THREE.Vector3();
+
+const PLAYER_ATTACK_RANGE = MINE_RANGE;
 function atkCursor() {
   if (!monsters.length) return false;
   _attackDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -8712,7 +10455,7 @@ function atkCursor() {
     _attackBox.max.set(m.x + half, m.y + half, m.z + half);
     if (_attackRay.intersectBox(_attackBox, _attackHit)) {
       const d = _attackHit.distanceTo(camera.position);
-      if (d < bestDist) {
+      if (d < bestDist && d <= PLAYER_ATTACK_RANGE) {
         bestDist = d;
         best = m;
       }
@@ -8730,7 +10473,7 @@ function atkCursor() {
       __horizonWeaponComboCount = 0;
     }
     __horizonWeaponComboCount++;
-    dmg = (wep.stats.dmg || 0) + best.maxHp * wpnDmgPct(wep, currentWave) + (wep.stats.pctMaxHp ? best.maxHp * wep.stats.pctMaxHp : 0);
+    dmg = (wep.stats.dmg || 0) + best.maxHp * wpnDmgPct(wep, currentWave, best) + (wep.stats.pctMaxHp ? best.maxHp * wep.stats.pctMaxHp : 0);
     if (wep.stats.thirdHitMult && __horizonWeaponComboCount % 3 === 0) dmg *= wep.stats.thirdHitMult;
     if (wep.stats.knockbackPct) {
       const dx = best.x - feetX,
@@ -8750,9 +10493,30 @@ function atkCursor() {
   }
   const top = equipped('armorTop');
   if (top && top.stats.atkBonusPct) {
-    dmg *= 1 + top.stats.atkBonusPct;
+    let bonusPct = top.stats.atkBonusPct;
+
+    if (typeof waveSkipMult === 'number' && waveSkipMult > 1) bonusPct /= waveSkipMult;
+    if (best.isSuperboss) bonusPct /= SUPERBOSS_DMG_PCT_DIVISOR;else if (best.isBoss) bonusPct /= BOSS_DMG_PCT_DIVISOR;
+    dmg *= 1 + bonusPct;
     if (top.stats.onHitSpeedBurst) speedBurst(1.3, 1.0);
     if (top.stats.onHitAtkImmunity) __horizonTempInvulnUntil = Math.max(__horizonTempInvulnUntil, nowSec() + 0.6);
+  }
+  const aoeFraction = best.maxHp > 0 ? dmg / best.maxHp : 0;
+  const aoeRadius = aoeRadiusForFraction(aoeFraction);
+  spawnHitFx(best.x, best.y, best.z, aoeRadius);
+  if (aoeRadius > 0) {
+    const secondaries = [];
+    for (const m of monsters) {
+      if (m === best || m.hp <= 0) continue;
+      const sdx = m.x - best.x,
+        sdz = m.z - best.z;
+      const sdist = Math.hypot(sdx, sdz);
+      if (sdist <= aoeRadius) secondaries.push([sdist, m]);
+    }
+    secondaries.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < Math.min(AOE_MAX_TARGETS, secondaries.length); i++) {
+      secondaries[i][1].hp -= secondaries[i][1].maxHp * aoeFraction * AOE_FALLOFF;
+    }
   }
   best.hp -= dmg;
   if (best.hp <= 0 && wep && wep.stats.resetOnKill) __horizonWeaponComboCount = 0;
@@ -8761,7 +10525,7 @@ function atkCursor() {
 feetX = CRAFTER_X;
 feetZ = CRAFTER_Z + 0.0001;
 feetY = crafterTopY;
-camera.position.set(feetX, feetY + EYE_HEIGHT, feetZ);
+camera.position.set(feetX, camEyeY(feetX, feetZ, feetY), feetZ);
 setRingR(ringSlider.value);
 setView(slider.value);
 lastCCX = Math.floor(feetX / chunkSize(0));
@@ -8794,14 +10558,20 @@ let fpsAccum = 0,
 const SAVE_KEY = LS_PREFIX + 'save';
 const SAVE_FORMAT_VERSION = 2;
 const hasSave = () => !!localStorage.getItem(SAVE_KEY);
+
 const buildSave = () => ({
   version: SAVE_FORMAT_VERSION,
   seed: WORLD_SEED,
   feetX,
   feetY,
   feetZ,
-  inventory,
-  equipment,
+  inventory: devMode && preDevInventorySnapshot ? preDevInventorySnapshot : inventory,
+  equipment: devMode && preDevEquipmentSnapshot ? {
+    ...equipment,
+    armorTop: preDevEquipmentSnapshot.armorTop,
+    armorMid: preDevEquipmentSnapshot.armorMid,
+    armorBottom: preDevEquipmentSnapshot.armorBottom
+  } : equipment,
   currentWave,
   health,
   selectedHotbarIndex,
@@ -8875,7 +10645,7 @@ const applySave = prof("applySave", function applySave(data) {
     }
     if (typeof rebuildAll === 'function') rebuildAll();
   }
-  camera.position.set(feetX, feetY + EYE_HEIGHT, feetZ);
+  camera.position.set(feetX, camEyeY(feetX, feetZ, feetY), feetZ);
   for (const slotName of EQUIP_SLOTS) rendSlot(slotName);
   rendHotbar();
   rendInv();
@@ -8919,6 +10689,7 @@ const importSave = prof("importSave", function importSave(text) {
   };
 });
 let menuOpen = true;
+let __spawnPrewarmed = false;
 let menuYaw = 0;
 canvas.style.filter = 'blur(8px)';
 const menuOverlayEl = document.getElementById('menuOverlay');
@@ -8932,7 +10703,7 @@ const closeMenu = prof("closeMenu", function closeMenu() {
   menuOverlayEl.style.display = 'none';
   document.body.classList.remove('menu-active');
   canvas.style.filter = '';
-  camera.position.set(feetX, feetY + EYE_HEIGHT, feetZ);
+  camera.position.set(feetX, camEyeY(feetX, feetZ, feetY), feetZ);
 });
 menuPlayBtn.addEventListener('click', () => {
   menuPlayRowEl.style.display = 'none';
@@ -8962,7 +10733,7 @@ const onDeath = prof("onDeath", function onDeath() {
     feetX = CRAFTER_X;
     feetZ = CRAFTER_Z + 0.0001;
     feetY = crafterTopY;
-    camera.position.set(feetX, feetY + EYE_HEIGHT, feetZ);
+    camera.position.set(feetX, camEyeY(feetX, feetZ, feetY), feetZ);
     uiHealth();
   }
   menuOpen = true;
@@ -9009,26 +10780,56 @@ importSaveBtn.addEventListener('click', () => {
   const result = importSave(text);
   saveDataMsgEl.textContent = result.ok ? 'Save imported.' : result.error;
 });
+
+const INSTALL_BUDGET_MS_MIN = 3;
+const INSTALL_BUDGET_MS_MAX = 20;
 const animate = prof("animate", function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
+  const installBudgetMs = Math.min(INSTALL_BUDGET_MS_MAX, Math.max(INSTALL_BUDGET_MS_MIN, dt * 1000 * 0.5));
   _groundTargetsDirty = true;
+  if (cutsceneActive) {
+    tickCutscene(dt);
+    return;
+  }
   if (menuOpen) {
     menuYaw += dt * (10 * Math.PI / 180);
     camera.position.set(0, 300, 0);
     camera.rotation.set(0, menuYaw, 0);
     postCam();
+    if (!__spawnPrewarmed) {
+      __spawnPrewarmed = true;
+      const r = RING_RADIUS + 1;
+      for (let dz = -r; dz <= r; dz++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const key = keyFor(0, dx, dz);
+          if (!genQueue.some(q => q.key === key)) {
+            genQueue.push({
+              key,
+              level: 0,
+              cx: dx,
+              cz: dz,
+              fine: true,
+              score: -Math.hypot(dx, dz)
+            });
+          }
+        }
+      }
+    }
     procQueue();
+    drainInstalls(performance.now() + installBudgetMs);
     return;
   }
   ensureNear(feetX, feetZ);
   ensureFooting();
+  drainInstalls(performance.now() + installBudgetMs);
   if (!inventoryOpen && !devConsoleOpen && !optionsOpen) {
     tickMove(dt);
     tickMining(dt);
     tickPlacing(dt);
     tickDrain(dt);
+    tickHpRegen(dt);
     tickMonsters(dt);
     tickSpawn(dt);
     waveDone();
@@ -9054,6 +10855,7 @@ const animate = prof("animate", function animate(now) {
     fpsFrames = 0;
     statsTimer = 0;
     statsEl.textContent = `FPS: ${fpsDisplay} | Chunks: ${chunkEntries.size} | Tris: ${Math.round(runningTriCount)}`;
+    rendPlayerStats();
   }
   if (perfLogIntervalSec > 0) {
     perfLogTimer += dt;
