@@ -36,7 +36,7 @@
     text-shadow: -1px -1px 0 rgba(0,0,0,0.6), 1px -1px 0 rgba(0,0,0,0.6),
                  -1px 1px 0 rgba(0,0,0,0.6), 1px 1px 0 rgba(0,0,0,0.6);
   }
-  
+
   *{ border-radius:0 !important; }
   #crosshair{ border-radius:50% !important; }
   html,body{margin:0;padding:0;overflow:hidden;background:var(--page-bg);height:100%;width:100%;}
@@ -46,7 +46,7 @@
     font-family: -apple-system, "Segoe UI", Arial, sans-serif;
     color:var(--text); user-select:none;
   }
-  
+
   #miniStats{
     background:var(--bg);
     border:2px solid var(--border);
@@ -154,7 +154,7 @@
   }
   #healthBarFill{
     height:100%; width:100%;
-    
+
     background:#7fe38a;
     transition: width 0.25s ease, background-color 0.25s ease;
   }
@@ -218,6 +218,25 @@
     background:rgba(0,0,0,0.45);
   }
   #invPanelWrap{ display:flex; flex-direction:column; align-items:center; gap:16px; }
+  #chestPanel{
+    display:none; flex-direction:column; align-items:center; gap:8px;
+    background:var(--bg); border:2px solid var(--border);
+    border-radius:10px; padding:10px 14px 8px;
+  }
+  #inventoryOverlay.withChest{ gap:28px; }
+  #inventoryOverlay.withChest #chestPanel{ display:flex; }
+  #chestPanel .armorPanelTitle{
+    font-family:-apple-system,"Segoe UI",Arial,sans-serif; font-size:10px;
+    letter-spacing:1px; text-transform:uppercase; color:var(--text-dim);
+  }
+  #chestSlots{ display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
+  .chestSlot{
+    width:52px; height:52px; border-radius:8px;
+    background:var(--bg); border:2px solid var(--border);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    font-family:-apple-system,"Segoe UI",Arial,sans-serif; color:var(--text);
+    cursor:grab; overflow:hidden;
+  }
   #armorPanel{
     display:flex; flex-direction:column; align-items:center; gap:8px;
     background:var(--bg); border:2px solid var(--border);
@@ -262,7 +281,7 @@
   body.menu-active #monsterLayer, body.menu-active #heldItemCanvas, body.menu-active #waveLabel,
   body.menu-active #waveBtn, body.menu-active #waveSkipLabel, body.menu-active #waveSkipBtn,
   body.menu-active #hotbar, body.menu-active #biomeBanner, body.menu-active #devBadge,
-  body.menu-active #ui, body.menu-active #craftPrompt, body.menu-active #playerStatsPanel{
+  body.menu-active #ui, body.menu-active #craftPrompt, body.menu-active #chestMineDeny, body.menu-active #playerStatsPanel{
     display:none !important;
   }
   .armorSlot .swatch{ width:26px; height:26px; }
@@ -328,8 +347,15 @@
     background:var(--bg); border:2px solid var(--border);
     border-radius:8px; padding:6px 12px; user-select:none; pointer-events:none;
   }
+  #chestMineDeny{
+    position:fixed; left:50%; bottom:110px; transform:translateX(-50%);
+    z-index:10; display:none; max-width:280px; text-align:center;
+    font-family:-apple-system,"Segoe UI",Arial,sans-serif; color:#fff; font-size:13px;
+    background:#7a1414; border:2px solid #ff5a5a;
+    border-radius:8px; padding:6px 12px; user-select:none; pointer-events:none;
+  }
   #invWheel{ position:relative; width:520px; height:520px; }
-  
+
   #invHex, #invRing{ position:absolute; inset:0; pointer-events:none; }
   .invslot{
     position:absolute; width:52px; height:52px; margin:-26px 0 0 -26px; border-radius:8px;
@@ -341,8 +367,11 @@
   .invslot .swatch{ width:18px; height:18px; border-radius:4px; margin-bottom:1px; flex-shrink:0; }
   .invslot .slotCount{ font-size:10px; line-height:11px; flex-shrink:0; }
   .invslot .slotName{ font-size:7px; line-height:1.05; text-align:center; max-width:48px; max-height:15px; overflow:hidden; opacity:0.85; word-break:break-word; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; }
+  .chestSlot .swatch{ width:18px; height:18px; border-radius:4px; margin-bottom:1px; flex-shrink:0; }
+  .chestSlot .slotCount{ font-size:10px; line-height:11px; flex-shrink:0; }
+  .chestSlot .slotName{ font-size:7px; line-height:1.05; text-align:center; max-width:48px; max-height:15px; overflow:hidden; opacity:0.85; word-break:break-word; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; }
   .invslot.selected{ border-color:#ffcf6b; box-shadow:0 0 0 1px #ffcf6b inset; }
-  .invslot.hex{ border-color:rgba(159,214,255,0.55); } 
+  .invslot.hex{ border-color:rgba(159,214,255,0.55); }
   #devConsole{
     position:fixed; left:0; right:0; top:0; z-index:30; display:none;
     font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
@@ -375,17 +404,17 @@
     font-weight:700; font-size:26px; text-transform:uppercase;
     text-shadow:0 2px 14px rgba(0,0,0,0.9), 0 0 18px currentColor;
     opacity:0; letter-spacing:70px;
-    
+
     transition: letter-spacing 5s ease-in, opacity 4.6s ease-in;
   }
-  
+
   #biomeBanner.in{
     opacity:1; letter-spacing:4px;
     transition: letter-spacing 0.7s cubic-bezier(.2,.8,.2,1), opacity 0.5s ease;
   }
-  
+
   #biomeBanner .ch{ display:inline-block; }
-  
+
   #biomeBanner .ch.stuck{ transition: transform 3s ease-out; }
   #biomeBanner.out .ch.stuck{ transform: translateY(-60vh); }
   #biomeBanner.out{
@@ -449,7 +478,7 @@
     color:var(--text); font-size:10px; letter-spacing:0.5px; opacity:0.75;
     z-index:10; user-select:none;
   }
-  
+
   #waveSkipBtn{
     position:fixed; left:calc(50% - 375px); bottom:16px;
     width:50px; height:52px; border-radius:8px;
@@ -468,6 +497,26 @@
     color:var(--text); font-size:9px; letter-spacing:0.3px; opacity:0.75;
     z-index:10; user-select:none;
   }
+  #musicPopup{
+    position:fixed; top:50%; right:0; transform:translate(100%,-50%);
+    z-index:16; pointer-events:none; user-select:none;
+    background:var(--bg); border:2px solid var(--border); border-right:none;
+    border-top-left-radius:10px; border-bottom-left-radius:10px;
+    padding:10px 16px 10px 14px; max-width:260px;
+    font-family:-apple-system,"Segoe UI",Arial,sans-serif; color:var(--text);
+    box-shadow:-4px 0 18px rgba(0,0,0,0.35);
+    transition: transform 0.5s cubic-bezier(.2,.8,.2,1);
+  }
+  #musicPopup.show{ transform:translate(0,-50%); }
+  #musicPopup .mpKicker{
+    font-size:9.5px; letter-spacing:0.8px; text-transform:uppercase;
+    opacity:0.6; margin-bottom:2px;
+  }
+  #musicPopup .mpTitle{
+    font-size:13px; font-weight:700; letter-spacing:0.2px; margin-bottom:2px;
+  }
+  #musicPopup .mpAuthor{ font-size:11px; opacity:0.85; margin-bottom:4px; }
+  #musicPopup .mpSource{ font-size:9.5px; opacity:0.55; }
 </style>
 </head>
 <body class="menu-active">
@@ -501,8 +550,17 @@
 <div id="waveSkipBtn">x1</div>
 <div id="hotbar"></div>
 <div id="biomeBanner"></div>
+<div id="musicPopup">
+  <div class="mpKicker">Now Playing</div>
+  <div class="mpTitle" id="musicPopupTitle"></div>
+  <div class="mpAuthor" id="musicPopupAuthor"></div>
+  <div class="mpSource" id="musicPopupSource">Source: dollchan.net</div>
+</div>
 <div id="devBadge"></div>
-<div id="inventoryOverlay"><div id="invPanelWrap">
+<div id="inventoryOverlay"><div id="chestPanel">
+  <div class="armorPanelTitle">Chest</div>
+  <div id="chestSlots"></div>
+</div><div id="invPanelWrap">
   <div id="armorPanel">
     <div class="armorPanelTitle">Equipment</div>
     <div class="armorRow">
@@ -529,6 +587,7 @@
   </div>
 </div></div>
 <div id="craftPrompt">Right-click the crafter to open it</div>
+<div id="chestMineDeny">A magical force stops you from mining the chest with items in it.</div>
 <div id="cutsceneOverlay"><div id="cutsceneFade"></div><div id="cutsceneText"></div></div>
 <div id="devConsole">
   <div id="devConsoleOutput"></div>
@@ -568,6 +627,11 @@
     <label>Mouse Sensitivity (<span id="sensVal">1.00</span>x)</label>
     <div class="row">
       <input id="sensSlider" type="range" min="0.1" max="4" step="0.05" value="1">
+    </div>
+
+    <label>Music Volume (<span id="musicVolVal">60</span>%)</label>
+    <div class="row">
+      <input id="musicVolSlider" type="range" min="0" max="100" step="1" value="60">
     </div>
 
     <label>Field of View (<span id="fovVal">75</span>&deg;<span id="fovModeTag"></span>)</label>
@@ -612,7 +676,7 @@
     </div>
     <span class="hint">Changing the seed reloads the page into a fresh world.</span>
 
-    <div class="hint">Click the screen to look around &middot; WASD to walk &middot; Space to jump &middot; Shift to sprint &middot; hold Left Click to mine &middot; hold Right Click (or Tab) to place &middot; right-click the crafter to open it &middot; 1-6 to select hotbar slot &middot; G to open inventory (drag items between slots, drag onto an equipment slot to equip) &middot; N to send the next wave &middot; E to close options / free-lock the cursor</div>
+    <div class="hint">Click the screen to look around &middot; WASD to walk &middot; Space to jump &middot; Shift to sprint &middot; hold Left Click to mine &middot; hold Right Click (or Tab) to place &middot; right-click the crafter to open it &middot; 1-6 to select hotbar slot &middot; G to open inventory (drag items between slots, drag onto an equipment slot to equip) &middot; look at a chest and press G to open it &middot; N to send the next wave &middot; E to close options / free-lock the cursor</div>
   </div>
 </div>
 
@@ -894,7 +958,7 @@ const BIOME_WARP_FREQ3 = BASE_FREQ * 1.4;
 const BIOME_WARP_AMOUNT3 = 34;
 const BIOME_WARP_FREQ4 = BASE_FREQ * 4;
 const BIOME_WARP_AMOUNT4 = 14;
-// Runs x,z through 4 layered noise warps before biome lookup, fading out near spawn, so biome borders look organic rather than straight.
+
 function biomeRaw(x, z) {
   const warpFadeStart = SPAWN_NULLZONE_RADIUS;
   const warpFadeEnd = SPAWN_NULLZONE_RADIUS + SPAWN_BLEND_WIDTH * 3;
@@ -991,11 +1055,6 @@ const TIDAL_DRIFT_AMOUNT = 0.18;
 const TIDAL_ANGLE = 0.6109;
 const TIDAL_DIR_X = Math.cos(TIDAL_ANGLE);
 const TIDAL_DIR_Z = Math.sin(TIDAL_ANGLE);
-const TIDAL_LEAN_RATE = 0.9;
-const TIDAL_DROPLET_HEIGHT = 7 * LEVEL0_TRI_WIDTH;
-const TIDAL_DROPLET_FREQ = BASE_FREQ * 2.4;
-const TIDAL_DROPLET_THRESHOLD = 0.62;
-const TIDAL_OVERHANG_MARGIN = TIDAL_WAVE_HEIGHT * 1.3 + TIDAL_DROPLET_HEIGHT * 2;
 function hashNoise(x, z) {
   const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453123;
   return (s - Math.floor(s)) * 2 - 1;
@@ -1058,52 +1117,7 @@ function tideH(x, z) {
   const v = -x * TIDAL_DIR_Z + z * TIDAL_DIR_X;
   return tideSurfH(u, v);
 }
-function tideBlend(raw) {
-  const lo = BIOME_RAW_CUTOFF.greeneryEnd,
-    hi = BIOME_RAW_CUTOFF.tidaliseEnd;
-  if (raw <= lo || raw >= hi) return 0;
-  const edge = Math.min(raw - lo, hi - raw);
-  if (edge >= BIOME_RAW_BLEND) return 1;
-  const t = edge / BIOME_RAW_BLEND;
-  return t * t * (3 - 2 * t);
-}
-function spawnFade(x, z) {
-  const dist = Math.hypot(x, z);
-  if (dist <= SPAWN_NULLZONE_RADIUS) return 0;
-  if (dist >= SPAWN_NULLZONE_RADIUS + SPAWN_BLEND_WIDTH) return 1;
-  const t = (dist - SPAWN_NULLZONE_RADIUS) / SPAWN_BLEND_WIDTH;
-  return t * t * (3 - 2 * t);
-}
-function tideFactor(x, z) {
-  return tideBlend(biomeRaw(x, z)) * spawnFade(x, z);
-}
-function tideDensity(x, y, z) {
-  const sx = x / TIDAL_XZ_SCALE,
-    sz = z / TIDAL_XZ_SCALE;
-  const u = sx * TIDAL_DIR_X + sz * TIDAL_DIR_Z;
-  const v = -sx * TIDAL_DIR_Z + sz * TIDAL_DIR_X;
-  const leanedU = u - y * TIDAL_LEAN_RATE / TIDAL_XZ_SCALE;
-  const surfaceY = tideSurfH(leanedU, v);
-  let d = surfaceY - y;
-  const dropletN = (noise.noiseAt(x * TIDAL_DROPLET_FREQ + 7000, (y + z) * TIDAL_DROPLET_FREQ + 7000) + noise.noiseAt(z * TIDAL_DROPLET_FREQ - 7000, (y + x) * TIDAL_DROPLET_FREQ - 7000)) * 0.5;
-  const band = Math.max(0, 1 - Math.abs(y - surfaceY - TIDAL_DROPLET_HEIGHT) / TIDAL_DROPLET_HEIGHT);
-  if (band > 0) d = Math.max(d, (dropletN - TIDAL_DROPLET_THRESHOLD) * band * TIDAL_WAVE_HEIGHT);
-  return d;
-}
-function tideSurfY(x, y, z) {
-  const sx = x / TIDAL_XZ_SCALE,
-    sz = z / TIDAL_XZ_SCALE;
-  const u = sx * TIDAL_DIR_X + sz * TIDAL_DIR_Z;
-  const v = -sx * TIDAL_DIR_Z + sz * TIDAL_DIR_X;
-  const leanedU = u - y * TIDAL_LEAN_RATE / TIDAL_XZ_SCALE;
-  return tideSurfH(leanedU, v);
-}
-function hardnessY(naturalY, x, y, z) {
-  const tidalT = tideFactor(x, z);
-  if (tidalT <= 0) return naturalY;
-  const localY = tideSurfY(x, y, z);
-  return tidalT >= 1 ? localY : naturalY * (1 - tidalT) + localY * tidalT;
-}
+
 function rockH(x, z) {
   x /= ROCK_XZ_SCALE;
   z /= ROCK_XZ_SCALE;
@@ -1200,15 +1214,12 @@ const mineColKey = prof("mineColKey", function mineColKey(x, z) {
 const bedrockOf = prof("bedrockOf", function bedrockOf(naturalY) {
   return naturalY - MAX_HARDNESS * LAYER_STEP;
 });
+
 const densAt = prof("densAt", function densAt(x, y, z, naturalY) {
   const key = densKey(densIdx(x), densIdx(y), densIdx(z));
   const edit = densityEdits.get(key);
   if (edit !== undefined) return edit;
-  const flat = naturalY - y;
-  const tidalT = tideFactor(x, z);
-  if (tidalT <= 0) return flat;
-  const tidal = tideDensity(x, y, z);
-  return tidalT >= 1 ? tidal : flat * (1 - tidalT) + tidal * tidalT;
+  return naturalY - y;
 });
 const sampleDens = prof("sampleDens", function sampleDens(x, y, z) {
   return densAt(x, y, z, heightAt(x, z));
@@ -1223,13 +1234,13 @@ const getBands = prof("getBands", function getBands(x, z) {
   }
   const naturalY = heightAt(x, z);
   const bedrockY = bedrockOf(naturalY);
-  const isTidal = tideFactor(x, z) > 0;
-  if (!nearMined && !isTidal) return [{
+
+  if (!nearMined) return [{
     top: naturalY,
     bottom: bedrockY
   }];
-  const scanBottom = bedrockY - (isTidal ? TIDAL_OVERHANG_MARGIN : 0);
-  const top = naturalY + (isTidal ? TIDAL_OVERHANG_MARGIN : 0) + DENS_STEP;
+  const scanBottom = bedrockY;
+  const top = naturalY + DENS_STEP;
   const spans = [];
   function crossing(yHi, yLo) {
     let lo = yLo,
@@ -1260,7 +1271,8 @@ const getBands = prof("getBands", function getBands(x, z) {
     bottom: scanBottom
   });
   if (spans.length === 0) spans.push({
-    top: bedrockY,
+
+    top: naturalY,
     bottom: bedrockY
   });
   return spans;
@@ -1274,7 +1286,7 @@ const hardAtY = prof("hardAtY", function hardAtY(naturalY, y) {
 const hardFor = prof("hardFor", function hardFor(naturalY, x, y, z) {
   const key = densKey(densIdx(x), densIdx(y), densIdx(z));
   const placed = placedHardness.get(key);
-  return placed !== undefined ? placed : hardAtY(hardnessY(naturalY, x, y, z), y);
+  return placed !== undefined ? placed : hardAtY(naturalY, y);
 });
 const biomeFor = prof("biomeFor", function biomeFor(x, y, z) {
   const key = densKey(densIdx(x), densIdx(y), densIdx(z));
@@ -1389,9 +1401,7 @@ function ensurePost() {
     cameraNY.up.set(0, 0, -1); cameraNY.lookAt(0, -1, 0);
     cameraPZ.up.set(0, -1, 0); cameraPZ.lookAt(0, 0, 1);
     cameraNZ.up.set(0, -1, 0); cameraNZ.lookAt(0, 0, -1);
-    // Mark this as already resolved so nothing can later call .update()
-    // and have updateCoordinateSystem() silently reset/no-op against
-    // these manually-assigned orientations.
+
     cubeCamera.coordinateSystem = THREE.WebGLCoordinateSystem;
     const faceProj = buildInfiniteReversedZProjection(90, 1, NEAR);
     for (const faceCam of cubeCamera.children) {
@@ -1426,7 +1436,7 @@ function ensurePost() {
         'uniform float uAspect;',
         'uniform float uDisplayFovDeg;',
         'uniform float uPaniniD;',
-        'uniform mat3 uCamBasis;', // columns: world-space right, up, forward
+        'uniform mat3 uCamBasis;',
         'vec2 paniniGeneric(vec2 viewPos, float d) {',
         '  float viewDist = 1.0 + d;',
         '  float viewHypSq = viewPos.x * viewPos.x + viewDist * viewDist;',
@@ -1476,7 +1486,7 @@ function updateCamBasisUniform() {
   const e = camera.matrixWorld.elements;
   _camRight.set(e[0], e[1], e[2]);
   _camUp.set(e[4], e[5], e[6]);
-  _camFwd.set(-e[8], -e[9], -e[10]); // camera looks down local -Z
+  _camFwd.set(-e[8], -e[9], -e[10]);
   postMesh.material.uniforms.uCamBasis.value.set(
     _camRight.x, _camUp.x, _camFwd.x,
     _camRight.y, _camUp.y, _camFwd.y,
@@ -1744,13 +1754,48 @@ const MONSTER_CUBE_GEO = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
   MONSTER_CUBE_GEO.setAttribute('barycentric', new THREE.Float32BufferAttribute(bary, 3));
 })();
 const monsterMeshes = new Map();
-function onSpawn(msg) {
+// Materials are pooled by a quantized color bucket instead of created fresh
+// per monster. Waves spawn many monsters with very similar hues (plus the
+// small per-monster jitter added on the main thread), so bucketing keeps the
+// number of distinct materials/shader programs low, which is cheaper to
+// build and cheaper on the GPU state-change side on low-end hardware.
+const MONSTER_MAT_QUANT = 0xF8F8F8;
+const monsterMatCache = new Map();
+function getMonsterMaterial(color) {
+  const key = color & MONSTER_MAT_QUANT;
+  let entry = monsterMatCache.get(key);
+  if (entry) {
+    entry.refs++;
+    return entry.mat;
+  }
   const mat = new THREE.MeshBasicMaterial({
-    color: msg.color,
+    color: key,
     fog: true,
     depthFunc: THREE.GreaterDepth
   });
   addWireOverlay(mat, false);
+  mat.__monsterMatKey = key;
+  monsterMatCache.set(key, {
+    mat,
+    refs: 1
+  });
+  return mat;
+}
+function releaseMonsterMaterial(mat) {
+  const key = mat.__monsterMatKey;
+  const entry = monsterMatCache.get(key);
+  if (!entry) {
+    mat.dispose();
+    return;
+  }
+  entry.refs--;
+  if (entry.refs <= 0) {
+    monsterMatCache.delete(key);
+    entry.mat.dispose();
+  }
+}
+function onSpawn(msg) {
+  const mat = getMonsterMaterial(msg.color);
   const mesh = new THREE.Mesh(MONSTER_CUBE_GEO, mat);
   mesh.position.set(msg.x, msg.y, msg.z);
   mesh.scale.setScalar(msg.scale || 1);
@@ -1762,7 +1807,7 @@ function onDespawn(msg) {
   const mesh = monsterMeshes.get(msg.id);
   if (!mesh) return;
   scene.remove(mesh);
-  mesh.material.dispose();
+  releaseMonsterMaterial(mesh.material);
   monsterMeshes.delete(msg.id);
 }
 function onMonsterXform(msg) {
@@ -1832,13 +1877,7 @@ let lastT = 0,
   fpsAccum = 0,
   statsTimer = 0;
 const msgQueue = [];
-// Sized for a healthy ~60fps device where a few ms is a small slice of a
-// 16.6ms frame. On slow hardware frame time balloons but a flat cap doesn't
-// scale with it, so mined/placed chunks end up trickling in at ~1 per
-// visible frame no matter how much frame time is actually available. Scale
-// the budget with the last measured frame interval instead (see
-// lastFrameIntervalMs below), within a floor/ceiling so a single spike can't
-// stall rendering.
+
 const WORKER_MSG_BUDGET_MS_MIN = 3;
 const WORKER_MSG_BUDGET_MS_MAX = 16;
 let lastFrameIntervalMs = 16.6;
@@ -1855,7 +1894,12 @@ function drainQueue() {
   }
 }
 function frame(now) {
-  requestAnimationFrame(frame);
+  // Driven by 'tick' messages from the main thread instead of its own
+  // requestAnimationFrame — see the 'tick' case in onMsg() below for why:
+  // a Worker's own rAF isn't guaranteed to track the display's true refresh
+  // rate on every browser (notably Firefox), so instead of trusting a second,
+  // independent rAF loop in here, the already-correct main-thread rAF loop
+  // (in animate()) just pings this function once per its own frame.
   if (!renderer) return;
   if (fpsCapMs > 0 && lastT && now - lastT < fpsCapMs) return;
   const rawIntervalMs = lastT ? Math.min(now - lastT, 100) : 16.6;
@@ -1908,7 +1952,6 @@ function frame(now) {
     statsTimer = 0;
   }
 }
-requestAnimationFrame(frame);
 function onMsg(msg) {
   switch (msg.type) {
     case 'init':
@@ -2032,6 +2075,9 @@ function onMsg(msg) {
       break;
     case 'spawnCrafter':
       onSpawnCrafter(msg);
+      break;
+    case 'tick':
+      frame(msg.now);
       break;
   }
 }
@@ -2238,7 +2284,6 @@ const BIOME_WARP_AMOUNT3 = 34;
 const BIOME_WARP_FREQ4 = BASE_FREQ * 4;
 const BIOME_WARP_AMOUNT4 = 14;
 function biomeRaw(x, z) {
-  // Warps x,z through 4 noise octaves before biome lookup, fading near spawn, so biome edges look irregular not a clean contour.
 
   const warpFadeStart = SPAWN_NULLZONE_RADIUS;
   const warpFadeEnd = SPAWN_NULLZONE_RADIUS + SPAWN_BLEND_WIDTH * 3;
@@ -2324,11 +2369,6 @@ const TIDAL_DRIFT_AMOUNT = 0.18;
 const TIDAL_ANGLE = 0.6109;
 const TIDAL_DIR_X = Math.cos(TIDAL_ANGLE);
 const TIDAL_DIR_Z = Math.sin(TIDAL_ANGLE);
-const TIDAL_LEAN_RATE = 0.9;
-const TIDAL_DROPLET_HEIGHT = 7 * LEVEL0_TRI_WIDTH;
-const TIDAL_DROPLET_FREQ = BASE_FREQ * 2.4;
-const TIDAL_DROPLET_THRESHOLD = 0.62;
-const TIDAL_OVERHANG_MARGIN = TIDAL_WAVE_HEIGHT * 1.3 + TIDAL_DROPLET_HEIGHT * 2;
 function hashNoise(x, z) {
   const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453123;
   return (s - Math.floor(s)) * 2 - 1;
@@ -2391,52 +2431,7 @@ function tideH(x, z) {
   const v = -x * TIDAL_DIR_Z + z * TIDAL_DIR_X;
   return tideSurfH(u, v);
 }
-function tideBlend(raw) {
-  const lo = BIOME_RAW_CUTOFF.greeneryEnd,
-    hi = BIOME_RAW_CUTOFF.tidaliseEnd;
-  if (raw <= lo || raw >= hi) return 0;
-  const edge = Math.min(raw - lo, hi - raw);
-  if (edge >= BIOME_RAW_BLEND) return 1;
-  const t = edge / BIOME_RAW_BLEND;
-  return t * t * (3 - 2 * t);
-}
-function spawnFade(x, z) {
-  const dist = Math.hypot(x, z);
-  if (dist <= SPAWN_NULLZONE_RADIUS) return 0;
-  if (dist >= SPAWN_NULLZONE_RADIUS + SPAWN_BLEND_WIDTH) return 1;
-  const t = (dist - SPAWN_NULLZONE_RADIUS) / SPAWN_BLEND_WIDTH;
-  return t * t * (3 - 2 * t);
-}
-function tideFactor(x, z) {
-  return tideBlend(biomeRaw(x, z)) * spawnFade(x, z);
-}
-function tideDensity(x, y, z) {
-  const sx = x / TIDAL_XZ_SCALE,
-    sz = z / TIDAL_XZ_SCALE;
-  const u = sx * TIDAL_DIR_X + sz * TIDAL_DIR_Z;
-  const v = -sx * TIDAL_DIR_Z + sz * TIDAL_DIR_X;
-  const leanedU = u - y * TIDAL_LEAN_RATE / TIDAL_XZ_SCALE;
-  const surfaceY = tideSurfH(leanedU, v);
-  let d = surfaceY - y;
-  const dropletN = (noise.noiseAt(x * TIDAL_DROPLET_FREQ + 7000, (y + z) * TIDAL_DROPLET_FREQ + 7000) + noise.noiseAt(z * TIDAL_DROPLET_FREQ - 7000, (y + x) * TIDAL_DROPLET_FREQ - 7000)) * 0.5;
-  const band = Math.max(0, 1 - Math.abs(y - surfaceY - TIDAL_DROPLET_HEIGHT) / TIDAL_DROPLET_HEIGHT);
-  if (band > 0) d = Math.max(d, (dropletN - TIDAL_DROPLET_THRESHOLD) * band * TIDAL_WAVE_HEIGHT);
-  return d;
-}
-function tideSurfY(x, y, z) {
-  const sx = x / TIDAL_XZ_SCALE,
-    sz = z / TIDAL_XZ_SCALE;
-  const u = sx * TIDAL_DIR_X + sz * TIDAL_DIR_Z;
-  const v = -sx * TIDAL_DIR_Z + sz * TIDAL_DIR_X;
-  const leanedU = u - y * TIDAL_LEAN_RATE / TIDAL_XZ_SCALE;
-  return tideSurfH(leanedU, v);
-}
-function hardnessY(naturalY, x, y, z) {
-  const tidalT = tideFactor(x, z);
-  if (tidalT <= 0) return naturalY;
-  const localY = tideSurfY(x, y, z);
-  return tidalT >= 1 ? localY : naturalY * (1 - tidalT) + localY * tidalT;
-}
+
 function rockH(x, z) {
   x /= ROCK_XZ_SCALE;
   z /= ROCK_XZ_SCALE;
@@ -2523,11 +2518,7 @@ function densAt(x, y, z, naturalY) {
   const key = densKey(densIdx(x), densIdx(y), densIdx(z));
   const edit = densityEdits.get(key);
   if (edit !== undefined) return edit;
-  const flat = naturalY - y;
-  const tidalT = tideFactor(x, z);
-  if (tidalT <= 0) return flat;
-  const tidal = tideDensity(x, y, z);
-  return tidalT >= 1 ? tidal : flat * (1 - tidalT) + tidal * tidalT;
+  return naturalY - y;
 }
 function getBands(x, z) {
   const ci = densIdx(x),
@@ -2539,13 +2530,13 @@ function getBands(x, z) {
   }
   const naturalY = heightAt(x, z);
   const bedrockY = bedrockOf(naturalY);
-  const isTidal = tideFactor(x, z) > 0;
-  if (!nearMined && !isTidal) return [{
+
+  if (!nearMined) return [{
     top: naturalY,
     bottom: bedrockY
   }];
-  const scanBottom = bedrockY - (isTidal ? TIDAL_OVERHANG_MARGIN : 0);
-  const top = naturalY + (isTidal ? TIDAL_OVERHANG_MARGIN : 0) + DENS_STEP;
+  const scanBottom = bedrockY;
+  const top = naturalY + DENS_STEP;
   const spans = [];
   function crossing(yHi, yLo) {
     let lo = yLo,
@@ -2576,7 +2567,8 @@ function getBands(x, z) {
     bottom: scanBottom
   });
   if (spans.length === 0) spans.push({
-    top: bedrockY,
+
+    top: naturalY,
     bottom: bedrockY
   });
   return spans;
@@ -2590,7 +2582,7 @@ function hardAtY(naturalY, y) {
 function hardFor(naturalY, x, y, z) {
   const key = densKey(densIdx(x), densIdx(y), densIdx(z));
   const placed = placedHardness.get(key);
-  return placed !== undefined ? placed : hardAtY(hardnessY(naturalY, x, y, z), y);
+  return placed !== undefined ? placed : hardAtY(naturalY, y);
 }
 function tintFor(x, y, z) {
   const key = densKey(densIdx(x), densIdx(y), densIdx(z));
@@ -2796,8 +2788,6 @@ function buildGridMesh(gx, gz, heights, res) {
 }
 const COLLAPSE_YIELD_EVERY = 48;
 
-// Generator so decimation can pause and resume across frames. Repeatedly collapses the
-// cheapest edge by quadric error cost until hitting targetTriCount or maxError.
 function* simplifyMeshGen(verts, tris, boundary, step, targetTriCount, maxError) {
   const nV = boundary.length;
   const vertAlive = new Uint8Array(nV).fill(1);
@@ -3040,11 +3030,7 @@ function* simplifyMeshGen(verts, tris, boundary, step, targetTriCount, maxError)
     tris: finalTris
   };
 }
-// Plain (non-generator) twin of simplifyMeshGen above. Used by the real-Worker
-// hot path, which runs off the main thread already and never needs to
-// time-slice — draining a generator there just pays per-yield-check overhead
-// on every chunk build for a capability nothing uses. simplifyMeshGen is kept
-// as-is for the main-thread fallback scheduler, which does need to pause.
+
 function simplifyMesh(verts, tris, boundary, step, targetTriCount, maxError) {
   const nV = boundary.length;
   const vertAlive = new Uint8Array(nV).fill(1);
@@ -3415,10 +3401,7 @@ function* buildChunkGen(level, cx, cz) {
     mainVertCount: mainCount
   };
 }
-// Plain (non-generator) twin of buildChunkGen above, for the real-Worker hot
-// path — see simplifyMesh/simplifyMeshGen comment above for why. Calls the
-// plain simplifyMesh (not simplifyMeshGen) so no part of this call chain pays
-// generator overhead when it's running off the main thread already.
+
 function buildChunk(level, cx, cz) {
   const size = chunkSize(level);
   const res = RES;
@@ -3551,11 +3534,7 @@ function buildChunk(level, cx, cz) {
 }
 const SN_CORNER = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
 const SN_EDGES = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
-// One vertex per sign changing cell in the density volume, then walks each cell's 12
-// edges to stitch faces between neighbors, building the terrain mesh.
-// Generator form: yields periodically across each of the 3 passes (density
-// sampling, vertex placement, quad stitching) so the fallback main-thread
-// scheduler can actually time-slice this instead of blocking in one shot.
+
 function* surfaceNetsGen(nx, ny, nz, sample, owned) {
   const YIELD_EVERY_K = 4;
   const iLo = owned ? owned.iLo : 0,
@@ -3656,9 +3635,7 @@ function* surfaceNetsGen(nx, ny, nz, sample, owned) {
     cellIdx
   };
 }
-// Plain (non-generator) twin of surfaceNetsGen above, for the same reason as
-// simplifyMesh/simplifyMeshGen: the real-Worker hot path never yields, so it
-// shouldn't pay generator/yield-check overhead on every chunk build.
+
 function surfaceNets(nx, ny, nz, sample, owned) {
   const iLo = owned ? owned.iLo : 0,
     iHi = owned ? owned.iHi : nx - 1;
@@ -3783,13 +3760,6 @@ function* buildFinePatchGen(cx, cz) {
   const SHELL_PAD = step * 3;
   let minY = naturalMinY - SHELL_PAD,
     maxY = naturalMaxY + SHELL_PAD;
-  const cxw = ox + size / 2,
-    czw = oz + size / 2;
-  const isTidalChunk = biomeOf(biomeRaw(cxw, czw)) === BIOME.TIDALISE;
-  if (isTidalChunk) {
-    minY -= TIDAL_OVERHANG_MARGIN;
-    maxY += TIDAL_OVERHANG_MARGIN;
-  }
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
       const b = minedChunkBounds.get(cx + dx + ',' + (cz + dz));
@@ -3898,9 +3868,7 @@ function* buildFinePatchGen(cx, cz) {
     }
   };
   let __quadN = 0;
-  // Track how many quads use each undirected edge (by local vertex index)
-  // as we go, so we can find the open/boundary edges of this patch's
-  // surface afterward without a second pass over vquads.
+
   const edgeInfo = new Map();
   for (const q of vquads) {
     const p0 = toWorld(q[0]),
@@ -3917,6 +3885,14 @@ function* buildFinePatchGen(cx, cz) {
       c3 = cellOf(q[3]);
     pushVolTri(p0, p1, p2, h0, h1, h2, c0, c1, c2);
     pushVolTri(p0, p2, p3, h0, h2, h3, c0, c2, c3);
+
+    const eux = p1[0] - p0[0],
+      euy = p1[1] - p0[1],
+      euz = p1[2] - p0[2];
+    const evx = p2[0] - p0[0],
+      evy = p2[1] - p0[1],
+      evz = p2[2] - p0[2];
+    const quadNormalY = euz * evx - eux * evz;
     for (let e = 0; e < 4; e++) {
       const a = q[e],
         b = q[(e + 1) % 4];
@@ -3925,22 +3901,14 @@ function* buildFinePatchGen(cx, cz) {
       if (rec) rec.count++;else edgeInfo.set(key, {
         count: 1,
         a,
-        b
+        b,
+        normalY: quadNormalY
       });
     }
     if (++__quadN % 1500 === 0) yield;
   }
-  // Seal every open edge of this patch (an edge used by exactly one quad)
-  // with a vertical skirt wall. Fine patches use a totally different
-  // meshing method (surface nets on a density volume) than the regular
-  // heightfield-grid chunks around them, so their boundary vertices never
-  // land on the same world-space points as a neighboring non-fine chunk's
-  // boundary -- there is no way to make them share vertices directly.
-  // The skirt hides that mismatch the same way buildChunkGen's addSkirt
-  // hides ordinary LOD-level cracks. Depth is generous relative to the
-  // base LOD skirt since this boundary can be a full topology mismatch
-  // rather than just a resolution mismatch.
-  const FINE_SKIRT_DEPTH = SKIRT_DEPTH_BASE * 4;
+
+  const FINE_SKIRT_DEPTH = 1;
   const skirtPos = [],
     skirtNrm = [],
     skirtCol = [],
@@ -3975,8 +3943,10 @@ function* buildFinePatchGen(cx, cz) {
     if (rec.count !== 1) continue;
     const pa = toWorld(rec.a),
       pb = toWorld(rec.b);
-    const paLow = [pa[0], pa[1] - FINE_SKIRT_DEPTH, pa[2]];
-    const pbLow = [pb[0], pb[1] - FINE_SKIRT_DEPTH, pb[2]];
+
+    const dir = rec.normalY < 0 ? 1 : -1;
+    const paLow = [pa[0], pa[1] + dir * FINE_SKIRT_DEPTH, pa[2]];
+    const pbLow = [pb[0], pb[1] + dir * FINE_SKIRT_DEPTH, pb[2]];
     pushSkirtTri(pa, paLow, pb);
     pushSkirtTri(pb, paLow, pbLow);
     if (++__edgeN % 1500 === 0) yield;
@@ -4013,8 +3983,7 @@ function* buildFinePatchGen(cx, cz) {
     mainVertCount: mainCount
   };
 }
-// Plain (non-generator) twin of buildFinePatchGen above, for the real-Worker
-// hot path — see simplifyMesh/simplifyMeshGen comment above for why.
+
 function buildFinePatch(cx, cz) {
   const size = chunkSize(0);
   const ox = cx * size,
@@ -4041,13 +4010,6 @@ function buildFinePatch(cx, cz) {
   const SHELL_PAD = step * 3;
   let minY = naturalMinY - SHELL_PAD,
     maxY = naturalMaxY + SHELL_PAD;
-  const cxw = ox + size / 2,
-    czw = oz + size / 2;
-  const isTidalChunk = biomeOf(biomeRaw(cxw, czw)) === BIOME.TIDALISE;
-  if (isTidalChunk) {
-    minY -= TIDAL_OVERHANG_MARGIN;
-    maxY += TIDAL_OVERHANG_MARGIN;
-  }
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
       const b = minedChunkBounds.get(cx + dx + ',' + (cz + dz));
@@ -4155,9 +4117,7 @@ function buildFinePatch(cx, cz) {
       bary.push(BARY[t][0], BARY[t][1], BARY[t][2]);
     }
   };
-  // Track how many quads use each undirected edge (by local vertex index)
-  // as we go, so we can find the open/boundary edges of this patch's
-  // surface afterward without a second pass over vquads.
+
   const edgeInfo = new Map();
   for (const q of vquads) {
     const p0 = toWorld(q[0]),
@@ -4174,6 +4134,14 @@ function buildFinePatch(cx, cz) {
       c3 = cellOf(q[3]);
     pushVolTri(p0, p1, p2, h0, h1, h2, c0, c1, c2);
     pushVolTri(p0, p2, p3, h0, h2, h3, c0, c2, c3);
+
+    const eux = p1[0] - p0[0],
+      euy = p1[1] - p0[1],
+      euz = p1[2] - p0[2];
+    const evx = p2[0] - p0[0],
+      evy = p2[1] - p0[1],
+      evz = p2[2] - p0[2];
+    const quadNormalY = euz * evx - eux * evz;
     for (let e = 0; e < 4; e++) {
       const a = q[e],
         b = q[(e + 1) % 4];
@@ -4182,21 +4150,13 @@ function buildFinePatch(cx, cz) {
       if (rec) rec.count++;else edgeInfo.set(key, {
         count: 1,
         a,
-        b
+        b,
+        normalY: quadNormalY
       });
     }
   }
-  // Seal every open edge of this patch (an edge used by exactly one quad)
-  // with a vertical skirt wall. Fine patches use a totally different
-  // meshing method (surface nets on a density volume) than the regular
-  // heightfield-grid chunks around them, so their boundary vertices never
-  // land on the same world-space points as a neighboring non-fine chunk's
-  // boundary -- there is no way to make them share vertices directly.
-  // The skirt hides that mismatch the same way buildChunkGen's addSkirt
-  // hides ordinary LOD-level cracks. Depth is generous relative to the
-  // base LOD skirt since this boundary can be a full topology mismatch
-  // rather than just a resolution mismatch.
-  const FINE_SKIRT_DEPTH = SKIRT_DEPTH_BASE * 4;
+
+  const FINE_SKIRT_DEPTH = 1;
   const skirtPos = [],
     skirtNrm = [],
     skirtCol = [],
@@ -4230,8 +4190,10 @@ function buildFinePatch(cx, cz) {
     if (rec.count !== 1) continue;
     const pa = toWorld(rec.a),
       pb = toWorld(rec.b);
-    const paLow = [pa[0], pa[1] - FINE_SKIRT_DEPTH, pa[2]];
-    const pbLow = [pb[0], pb[1] - FINE_SKIRT_DEPTH, pb[2]];
+
+    const dir = rec.normalY < 0 ? 1 : -1;
+    const paLow = [pa[0], pa[1] + dir * FINE_SKIRT_DEPTH, pa[2]];
+    const pbLow = [pb[0], pb[1] + dir * FINE_SKIRT_DEPTH, pb[2]];
     pushSkirtTri(pa, paLow, pb);
     pushSkirtTri(pb, paLow, pbLow);
   }
@@ -4299,12 +4261,7 @@ class ChunkBuildScheduler {
     const remaining = FRAME_BUDGET_MS - elapsedThisFrame;
     const adaptiveSlice = Math.max(1, remaining * 0.5);
     const deadline = now0 + adaptiveSlice;
-    // Keep stepping the front job as long as budget remains, instead of
-    // stopping after a single yield. Previously a break statement here meant
-    // every tick did exactly one yield-step regardless of how much of the
-    // slice was left, so jobs finished far slower than the budget allowed
-    // and then dumped their install cost into one late, spiky frame. Using
-    // the full slice each frame makes jobs finish in fewer, steadier frames.
+
     while (this.jobs.length && performance.now() < deadline) {
       const job = this.jobs[0];
       const r = job.gen.next();
@@ -4316,12 +4273,7 @@ class ChunkBuildScheduler {
         });
       }
     }
-    // Install completed chunks (BufferGeometry + BVH build) under the same
-    // per-frame budget, rather than always running them immediately when a
-    // job finishes. That uninterruptible install cost used to land on top
-    // of whatever generation work already happened that frame; now a chunk
-    // that finishes late in an already-busy frame just waits for a frame
-    // with room, instead of stacking its cost on top of that frame's.
+
     while (this.installQueue.length && performance.now() < deadline) {
       const item = this.installQueue.shift();
       item.onDone(item.value);
@@ -4416,7 +4368,7 @@ let terrainWatchdogArmedAt = null;
 let terrainWatchdogVisHandler = null;
 const scheduleTerrainWatchdog = prof("scheduleTerrainWatchdog", function scheduleTerrainWatchdog() {
   if (terrainWatchdog || usingFallbackTerrain || sawAnyChunkBuilt) return;
-  if (typeof document !== 'undefined' && document.hidden) return; 
+  if (typeof document !== 'undefined' && document.hidden) return;
   terrainWatchdogArmedAt = performance.now();
   terrainWatchdog = setTimeout(() => {
     terrainWatchdog = null;
@@ -4733,13 +4685,11 @@ const cachePut = prof("cachePut", function cachePut(key, entry) {
 const LOD_DEADBAND_FRACTION = 0.04;
 const _levelAnchorX = [];
 const _levelAnchorZ = [];
-// Recenters each far LOD ring only once the player crosses a per-level deadband, avoiding chunk churn from imperceptible distance changes.
+
 const neededSet = prof("neededSet", function neededSet(viewLevel, px, pz) {
   const set = new Map();
-  let covMinX = 0,
-    covMaxX = 0,
-    covMinZ = 0,
-    covMaxZ = 0;
+
+  const coveredRects = [];
   for (let level = 0; level < viewLevel; level++) {
     const size = chunkSize(level);
     let ax = _levelAnchorX[level],
@@ -4764,7 +4714,7 @@ const neededSet = prof("neededSet", function neededSet(viewLevel, px, pz) {
           wx1 = wx0 + size;
         const wz0 = cz * size,
           wz1 = wz0 + size;
-        if (level > 0 && wx0 >= covMinX && wx1 <= covMaxX && wz0 >= covMinZ && wz1 <= covMaxZ) continue;
+        if (level > 0 && coveredRects.some(r => wx0 >= r.x0 && wx1 <= r.x1 && wz0 >= r.z0 && wz1 <= r.z1)) continue;
         const isFine = fineRadius >= 0 && Math.abs(dx) <= fineRadius && Math.abs(dz) <= fineRadius;
         set.set(keyFor(level, cx, cz), [level, cx, cz, isFine]);
       }
@@ -4774,20 +4724,23 @@ const neededSet = prof("neededSet", function neededSet(viewLevel, px, pz) {
     const bz0 = (ccz - RING_RADIUS) * size,
       bz1 = (ccz + RING_RADIUS + 1) * size;
     if (level === 0) {
-      covMinX = bx0;
-      covMaxX = bx1;
-      covMinZ = bz0;
-      covMaxZ = bz1;
+
       for (const ckey of minedChunkBounds.keys()) {
         const [tcx, tcz] = chunkXZ0(ckey);
+        const mwx0 = tcx * size,
+          mwx1 = mwx0 + size;
+        const mwz0 = tcz * size,
+          mwz1 = mwz0 + size;
+        if (mwx1 < bx0 || mwx0 > bx1 || mwz1 < bz0 || mwz0 > bz1) continue;
         set.set(keyFor(0, tcx, tcz), [0, tcx, tcz, true]);
       }
-    } else {
-      covMinX = Math.min(covMinX, bx0);
-      covMaxX = Math.max(covMaxX, bx1);
-      covMinZ = Math.min(covMinZ, bz0);
-      covMaxZ = Math.max(covMaxZ, bz1);
     }
+    coveredRects.push({
+      x0: bx0,
+      x1: bx1,
+      z0: bz0,
+      z1: bz1
+    });
   }
   return set;
 });
@@ -5314,7 +5267,7 @@ const takeDmg = prof("takeDmg", function takeDmg(amount, sourceMonster) {
 });
 uiHealth();
 
-const BASE_HP_REGEN_PCT_PER_SEC = 0.01; 
+const BASE_HP_REGEN_PCT_PER_SEC = 0.01;
 function hpRegenPctPerSec() {
   let pct = BASE_HP_REGEN_PCT_PER_SEC;
   if (typeof equipment === 'undefined') return pct;
@@ -5581,6 +5534,76 @@ const craftCursor = () => {
   _craftRaycaster.far = CRAFTER_INTERACT_RANGE + CRAFTER_RADIUS;
   return _craftRaycaster.intersectObject(crafterCollisionMesh, false).length > 0;
 };
+const CHEST_SIZE = 1;
+const CHEST_SLOT_COUNT = 6;
+const CHEST_COLOR = 0x6b4a2f;
+const CHEST_INTERACT_RANGE = 4;
+const CHEST_MINE_SECONDS = 1.5;
+const chests = [];
+let nextChestId = -1;
+let openChestId = null;
+const _chestRaycaster = new THREE.Raycaster();
+const _chestRayDir = new THREE.Vector3();
+function makeChestCollisionMesh(x, y, z) {
+  const geo = new THREE.BoxGeometry(CHEST_SIZE, CHEST_SIZE, CHEST_SIZE);
+  geo.computeBoundsTree();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+  mesh.position.set(x, y + CHEST_SIZE / 2, z);
+  mesh.updateMatrixWorld(true);
+  mesh.userData.mainVertCount = Infinity;
+  mesh.userData.isChest = true;
+  return mesh;
+}
+
+const placeChest = prof("placeChest", function placeChest(px, py, pz) {
+  const id = nextChestId--;
+  const mesh = makeChestCollisionMesh(px, py, pz);
+  mesh.userData.chestId = id;
+  chests.push({
+    id,
+    x: px,
+    y: py,
+    z: pz,
+    slots: new Array(CHEST_SLOT_COUNT).fill(null),
+    mesh
+  });
+  _groundTargetsDirty = true;
+  renderWorker.postMessage({
+    type: 'spawnMonster',
+    id,
+    x: px,
+    y: py + CHEST_SIZE / 2,
+    z: pz,
+    color: CHEST_COLOR,
+    scale: CHEST_SIZE
+  });
+});
+const destroyChest = prof("destroyChest", function destroyChest(id) {
+  const idx = chests.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  const chest = chests[idx];
+  chests.splice(idx, 1);
+  renderWorker.postMessage({
+    type: 'removeMonster',
+    id: chest.id
+  });
+  _groundTargetsDirty = true;
+  if (openChestId === chest.id) {
+    openChestId = null;
+    if (typeof inventoryOverlayEl !== 'undefined') inventoryOverlayEl.classList.remove('withChest');
+    if (typeof rendChestList === 'function') rendChestList();
+  }
+});
+const chestCursor = () => {
+  if (!chests.length) return null;
+  _chestRayDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  _chestRaycaster.set(camera.position, _chestRayDir);
+  _chestRaycaster.far = CHEST_INTERACT_RANGE + CHEST_SIZE;
+  const meshes = chests.map(c => c.mesh);
+  const hits = _chestRaycaster.intersectObjects(meshes, false);
+  if (!hits.length) return null;
+  return chests.find(c => c.mesh === hits[0].object) || null;
+};
 let yaw = Math.PI,
   pitch = -0.12;
 const keys = {};
@@ -5604,7 +5627,8 @@ document.addEventListener('keydown', e => {
     rendHotbar();
   }
   if (e.code === 'KeyG' && !typingInField && !cutsceneActive) {
-    toggleInv();
+    const lookedChest = document.pointerLockElement === canvas ? chestCursor() : null;
+    toggleInv(lookedChest ? lookedChest.id : null);
   }
   if (e.code === 'KeyX' && !typingInField && inventoryOpen && hoveredInvIndex !== null) {
     delSlot(hoveredInvIndex);
@@ -5622,6 +5646,8 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => keys[e.code] = false);
 let mouseDown = false;
 let placeDown = false;
+let atkHeld = false;
+let attackHoldCooldown = 0;
 
 window.addEventListener('pointerdown', e => {
   if (e.target !== canvas) return;
@@ -5634,11 +5660,19 @@ window.addEventListener('pointerdown', e => {
   }
   if (e.button === 0) {
     mouseDown = true;
-    if (document.pointerLockElement === canvas && atkCursor()) mouseDown = false;
+    atkHeld = true;
+    if (document.pointerLockElement === canvas) registerClickForCps();
+    if (document.pointerLockElement === canvas && atkCursor()) {
+      mouseDown = false;
+      attackHoldCooldown = ATTACK_HOLD_INTERVAL;
+    }
   } else placeDown = true;
 });
 window.addEventListener('pointerup', e => {
-  if (e.button === 0) mouseDown = false;else if (e.button === 2) placeDown = false;
+  if (e.button === 0) {
+    mouseDown = false;
+    atkHeld = false;
+  } else if (e.button === 2) placeDown = false;
 });
 window.addEventListener('contextmenu', e => {
   if (e.target === canvas) e.preventDefault();
@@ -5667,12 +5701,12 @@ let grounded = false;
 let airborneStartY = null;
 
 let __horizonUsedFastFallThisAir = false;
-const FAST_FALL_KEYS = ['ControlLeft', 'ControlRight'];
+const FAST_FALL_KEYS = ['KeyX', 'ArrowDown'];
 const FAST_FALL_SPEED = 40;
 
-const GROUND_SMASH_BASE_RADIUS = 6;
-const GROUND_SMASH_RADIUS_PER_FALL_UNIT = 0.15;
-const GROUND_SMASH_MAX_RADIUS = 20;
+const GROUND_SMASH_BASE_RADIUS = 14;
+const GROUND_SMASH_RADIUS_PER_FALL_UNIT = 0.25;
+const GROUND_SMASH_MAX_RADIUS = 40;
 const GROUND_SMASH_FALLBACK_PCT = 0.20;
 let lastCCX = NaN,
   lastCCZ = NaN;
@@ -5705,6 +5739,7 @@ const rayTargets = prof("rayTargets", function rayTargets() {
     arr.push(entry.mesh);
   }
   arr.push(crafterCollisionMesh);
+  for (const chest of chests) arr.push(chest.mesh);
   _groundTargetsCache = arr;
   _groundTargetsDirty = false;
   return arr;
@@ -5770,7 +5805,7 @@ const CAM_CLIP_FORCE_DIST = 0.4;
 let _camClipSkipCounter = 0;
 let _lastClampX = camera.position.x,
   _lastClampZ = camera.position.z;
-// Skips clampCam's wall-sweep raycasts most frames while the camera barely moves, forcing a real check once movement exceeds a safe distance.
+
 function maybeClampCam() {
   const dx = camera.position.x - _lastClampX;
   const dz = camera.position.z - _lastClampZ;
@@ -5863,7 +5898,7 @@ const headBlocked = prof("headBlocked", function headBlocked(x, z, landingY) {
 const _eyeClearRaycaster = new THREE.Raycaster();
 const _eyeClearDir = new THREE.Vector3(0, 1, 0);
 const _eyeClearOrigin = new THREE.Vector3();
-// Raycasts straight up from the feet to find real ceiling clearance, since falling skips the headroom check horizontal movement normally relies on.
+
 const overheadClearance = prof("overheadClearance", function overheadClearance(x, z, feetYNow) {
   const cap = EYE_HEIGHT + CAM_CLIP_BUFFER;
   const targets = rayTargets();
@@ -5889,7 +5924,19 @@ const colBlocked = prof("colBlocked", function colBlocked(x, z, feetYNow) {
   if (landingY === null) return true;
   return headBlocked(x, z, landingY);
 });
+const chestBlockedAt = prof("chestBlockedAt", function chestBlockedAt(x, z) {
+  const halfW = CHEST_SIZE / 2;
+  for (const chest of chests) {
+    const nearestX = Math.max(chest.x - halfW, Math.min(x, chest.x + halfW));
+    const nearestZ = Math.max(chest.z - halfW, Math.min(z, chest.z + halfW));
+    const dx = x - nearestX,
+      dz = z - nearestZ;
+    if (dx * dx + dz * dz < PLAYER_RADIUS * PLAYER_RADIUS) return true;
+  }
+  return false;
+});
 const blockedAt = prof("blockedAt", function blockedAt(x, z, feetYNow) {
+  if (chestBlockedAt(x, z)) return true;
   if (colBlocked(x, z, feetYNow)) return true;
   const r = PLAYER_RADIUS;
   return colBlocked(x + r, z, feetYNow) || colBlocked(x - r, z, feetYNow) || colBlocked(x, z + r, feetYNow) || colBlocked(x, z - r, feetYNow);
@@ -5949,7 +5996,7 @@ const tickMove = prof("tickMove", function tickMove(dt) {
     const gildBottomTier = equipped('gildBottom');
     let gildBottomTargetMult = 1,
       accelPct = null;
-    if (gildBottomEquip && gildBottomEquip.type === 'sunshine_breeze') gildBottomTargetMult = 2;else {
+    if (gildBottomEquip && gildBottomEquip.type === 'sunshine_breeze') gildBottomTargetMult = 1.6;else {
       if (gildBottomTier && gildBottomTier.stats.speedMult !== undefined) {
         gildBottomTargetMult = gildBottomTier.stats.speedMult;
         accelPct = gildBottomTier.stats.accelPct;
@@ -5991,10 +6038,10 @@ const tickMove = prof("tickMove", function tickMove(dt) {
       __horizonPlayerKbTimeLeft -= dt;
     }
     let gravityMult = 1;
-    if (maskEquipped) gravityMult = 0.5;else if (phaseMantle && phaseMantle.stats.gravityMult !== undefined) gravityMult = phaseMantle.stats.gravityMult;
+    if (maskEquipped) gravityMult = 0.65;else if (phaseMantle && phaseMantle.stats.gravityMult !== undefined) gravityMult = phaseMantle.stats.gravityMult;
     if (__horizonFinalJumpActive) gravityMult *= 0.4;
 
-    const fastFallHeld = !grounded && gravityMult !== 1 && (keys[FAST_FALL_KEYS[0]] || keys[FAST_FALL_KEYS[1]]);
+    const fastFallHeld = !grounded && (gravityMult !== 1 || wingsEquipped) && (keys[FAST_FALL_KEYS[0]] || keys[FAST_FALL_KEYS[1]]);
     if (fastFallHeld) __horizonUsedFastFallThisAir = true;
     playerVelY += GRAVITY * gravityMult * dt;
     if (fastFallHeld && playerVelY > -FAST_FALL_SPEED) playerVelY = -FAST_FALL_SPEED;
@@ -6011,8 +6058,9 @@ const tickMove = prof("tickMove", function tickMove(dt) {
         if (fallDistance > FALL_DAMAGE_FREE_UNITS && !wingsFallSafe && !phaseFallImmune) {
           takeDmg((fallDistance - FALL_DAMAGE_FREE_UNITS) * FALL_DAMAGE_PER_EXTRA_UNIT);
         }
-        if (isActive() && usedFastFall && fallDistance > FALL_DAMAGE_FREE_UNITS) {
-          groundSmash(feetX, feetZ, fallDistance);
+        if (usedFastFall && fallDistance > FALL_DAMAGE_FREE_UNITS) {
+
+          if (isActive()) groundSmash(feetX, feetZ, fallDistance, 1);else if (wingsEquipped) groundSmash(feetX, feetZ, fallDistance, 0.5);
         }
       }
       __horizonUsedFastFallThisAir = false;
@@ -6048,7 +6096,9 @@ const tickMove = prof("tickMove", function tickMove(dt) {
     const maxJumps = wingsEquipped ? 3 : barbedCrown && barbedCrown.stats.maxJumps !== undefined ? barbedCrown.stats.maxJumps : 1;
     const maxDashes = phaseMantle && phaseMantle.stats.midairDashes ? phaseMantle.stats.midairDashes : 0;
     if (spaceJustPressed && jumpsUsedThisAir < maxJumps) {
-      playerVelY = JUMP_SPEED * (maskEquipped ? 2 : 1);
+      let jumpHeightMult = 1;
+      if (maskEquipped) jumpHeightMult = 1.6;else if (phaseMantle && phaseMantle.stats.jumpHeightMult !== undefined) jumpHeightMult = phaseMantle.stats.jumpHeightMult;
+      playerVelY = JUMP_SPEED * jumpHeightMult;
       grounded = false;
       jumpsUsedThisAir++;
       __horizonFinalJumpActive = !!(barbedCrown && barbedCrown.stats.slowFallFinal && jumpsUsedThisAir >= maxJumps);
@@ -6076,7 +6126,17 @@ const tickMove = prof("tickMove", function tickMove(dt) {
     lastCCZ = ccz;
     tickChunks();
   }
-  craftPromptEl.style.display = nearCraft() && !craftOpen && !inventoryOpen && !optionsOpen ? 'block' : 'none';
+  const promptOk = !craftOpen && !inventoryOpen && !optionsOpen;
+  const lookedChestForPrompt = promptOk && document.pointerLockElement === canvas ? chestCursor() : null;
+  if (lookedChestForPrompt) {
+    craftPromptEl.textContent = 'Press G to open';
+    craftPromptEl.style.display = 'block';
+  } else if (promptOk && nearCraft()) {
+    craftPromptEl.textContent = 'Right-click the crafter to open it';
+    craftPromptEl.style.display = 'block';
+  } else {
+    craftPromptEl.style.display = 'none';
+  }
 });
 const MINE_RANGE = 8;
 const DEV_MINE_RANGE = 500;
@@ -6088,6 +6148,7 @@ const pickMine = prof("pickMine", function pickMine() {
   _rayDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
   raycaster.set(camera.position, _rayDir);
   const targets = [crafterCollisionMesh];
+  for (const chest of chests) targets.push(chest.mesh);
   for (const entry of chunkEntries.values()) {
     if (entry.level > 1) continue;
     targets.push(entry.mesh);
@@ -6342,6 +6403,10 @@ const NEW_ITEM_META = {
   event_horizon: {
     name: 'Event Horizon',
     color: '#000000'
+  },
+  chest: {
+    name: 'Chest',
+    color: '#6b4a2f'
   }
 };
 for (const key in NEW_ITEM_META) MATERIAL_COLORS[key] = NEW_ITEM_META[key].color;
@@ -6443,6 +6508,18 @@ const moveItem = prof("moveItem", function moveItem(fromIndex, toIndex) {
   rendInv();
 });
 const inventoryOverlayEl = document.getElementById('inventoryOverlay');
+const invWheelEl = document.getElementById('invWheel');
+const chestPanelEl = document.getElementById('chestPanel');
+const alignChestPanel = prof("alignChestPanel", function alignChestPanel() {
+  if (!chestPanelEl || !invWheelEl) return;
+  chestPanelEl.style.transform = '';
+  if (openChestId === null) return;
+  const hexRect = invWheelEl.getBoundingClientRect();
+  const chestRect = chestPanelEl.getBoundingClientRect();
+  const hexCenterY = hexRect.top + hexRect.height / 2;
+  const chestCenterY = chestRect.top + chestRect.height / 2;
+  chestPanelEl.style.transform = `translateY(${hexCenterY - chestCenterY}px)`;
+});
 const invHexEl = document.getElementById('invHex');
 const invRingEl = document.getElementById('invRing');
 const inventorySlotEls = new Array(INVENTORY_SIZE).fill(null);
@@ -6754,19 +6831,146 @@ const rendHeld = prof("rendHeld", function rendHeld(dt) {
   heldMesh.position.y = -0.25 + Math.sin(heldSpinT * 1.3) * 0.035;
   heldRenderer.render(heldScene, heldCamera);
 });
-const toggleInv = prof("toggleInv", function toggleInv() {
+const toggleInv = prof("toggleInv", function toggleInv(chestId) {
   inventoryOpen = !inventoryOpen;
+  openChestId = inventoryOpen && chestId !== undefined && chestId !== null ? chestId : null;
+  inventoryOverlayEl.classList.toggle('withChest', openChestId !== null);
   inventoryOverlayEl.style.display = inventoryOpen ? 'flex' : 'none';
   hotbarEl.style.display = inventoryOpen ? 'none' : 'flex';
   heldItemCanvasEl.style.display = inventoryOpen || !inventory[selectedHotbarIndex] ? 'none' : 'block';
   if (inventoryOpen) {
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     rendInv();
+    rendChestList();
   }
+  alignChestPanel();
 });
 inventoryOverlayEl.addEventListener('click', e => {
   if (e.target === inventoryOverlayEl) toggleInv();
 });
+const chestSlotsEl = document.getElementById('chestSlots');
+const chestSlotEls = [];
+let chestDragIndex = null;
+const getOpenChest = () => openChestId !== null ? chests.find(c => c.id === openChestId) || null : null;
+const moveInvToChest = prof("moveInvToChest", function moveInvToChest(invIndex, chest, chestIndex) {
+  const from = inventory[invIndex];
+  if (!from) return;
+  const to = chest.slots[chestIndex];
+  if (!to) {
+    chest.slots[chestIndex] = from;
+    inventory[invIndex] = null;
+  } else if (to.type === from.type) {
+    const room = Number.isFinite(to.count) ? HOTBAR_STACK_MAX - to.count : Infinity;
+    const moved = Math.min(room, from.count);
+    to.count += moved;
+    from.count -= moved;
+    if (from.count <= 0) inventory[invIndex] = null;
+  } else {
+    chest.slots[chestIndex] = from;
+    inventory[invIndex] = to;
+  }
+  rendHotbar();
+  rendInv();
+  rendChestList();
+});
+const moveChestToInv = prof("moveChestToInv", function moveChestToInv(chest, chestIndex, invIndex) {
+  const from = chest.slots[chestIndex];
+  if (!from) return;
+  const to = inventory[invIndex];
+  if (!to) {
+    inventory[invIndex] = from;
+    chest.slots[chestIndex] = null;
+  } else if (to.type === from.type) {
+    const room = Number.isFinite(to.count) ? HOTBAR_STACK_MAX - to.count : Infinity;
+    const moved = Math.min(room, from.count);
+    to.count += moved;
+    from.count -= moved;
+    if (from.count <= 0) chest.slots[chestIndex] = null;
+  } else {
+    inventory[invIndex] = from;
+    chest.slots[chestIndex] = to;
+  }
+  rendHotbar();
+  rendInv();
+  rendChestList();
+});
+const moveChestToChest = prof("moveChestToChest", function moveChestToChest(chest, fromIndex, toIndex) {
+  if (fromIndex === toIndex) return;
+  const from = chest.slots[fromIndex],
+    to = chest.slots[toIndex];
+  if (!from) return;
+  if (!to) {
+    chest.slots[toIndex] = from;
+    chest.slots[fromIndex] = null;
+  } else if (to.type === from.type) {
+    const room = Number.isFinite(to.count) ? HOTBAR_STACK_MAX - to.count : Infinity;
+    const moved = Math.min(room, from.count);
+    to.count += moved;
+    from.count -= moved;
+    if (from.count <= 0) chest.slots[fromIndex] = null;
+  } else {
+    chest.slots[toIndex] = from;
+    chest.slots[fromIndex] = to;
+  }
+  rendChestList();
+});
+const rendChestList = prof("rendChestList", function rendChestList() {
+  const chest = getOpenChest();
+  for (let i = 0; i < CHEST_SLOT_COUNT; i++) {
+    const el = chestSlotEls[i];
+    const item = chest ? chest.slots[i] : null;
+    el.innerHTML = slotHtml(item);
+    setSlotTitle(el, item);
+  }
+});
+for (let i = 0; i < CHEST_SLOT_COUNT; i++) {
+  const el = document.createElement('div');
+  el.className = 'chestSlot';
+  el.draggable = true;
+  el.addEventListener('dragstart', e => {
+    const chest = getOpenChest();
+    if (!chest || !chest.slots[i]) {
+      e.preventDefault();
+      return;
+    }
+    chestDragIndex = i;
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  el.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    const chest = getOpenChest();
+    if (chest) {
+      if (chestDragIndex !== null) moveChestToChest(chest, chestDragIndex, i);
+      else if (dragSourceIndex !== null) moveInvToChest(dragSourceIndex, chest, i);
+    }
+    dragSourceIndex = null;
+    chestDragIndex = null;
+  });
+  el.addEventListener('dragend', () => {
+    chestDragIndex = null;
+  });
+  chestSlotsEl.appendChild(el);
+  chestSlotEls.push(el);
+}
+for (let i = 0; i < INVENTORY_SIZE; i++) {
+  const el = inventorySlotEls[i];
+  el.addEventListener('dragover', e => {
+    if (chestDragIndex === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+  el.addEventListener('drop', e => {
+    if (chestDragIndex === null) return;
+    e.preventDefault();
+    const chest = getOpenChest();
+    if (chest) moveChestToInv(chest, chestDragIndex, i);
+    chestDragIndex = null;
+  });
+}
 const CRAFTING_RECIPES = [{
   id: 'sunshine_breeze',
   name: 'Sunshine Breeze',
@@ -6784,6 +6988,28 @@ const CRAFTING_RECIPES = [{
     count: 1
   }
 }, {
+  id: 'moonshine_mask',
+  name: 'Moonshine Mask',
+  color: '#3aa0e0',
+  desc: 'The Moon can make you feel lighter, or drunker, depending on your definition of Moonshine...',
+  inputs: [{
+    type: 'tidalise_soft',
+    count: 5
+  }, {
+    type: 'tidalise_solid',
+    count: 5
+  }, {
+    type: 'tidalise_strong',
+    count: 5
+  }, {
+    type: 'tidalise_sturdy',
+    count: 5
+  }],
+  output: {
+    type: 'moonshine_mask',
+    count: 1
+  }
+}, {
   id: 'rock_armor_top',
   name: 'Rock Armor (Top)',
   color: '#9a9ca3',
@@ -6794,32 +7020,6 @@ const CRAFTING_RECIPES = [{
   }],
   output: {
     type: 'rock_armor_top',
-    count: 1
-  }
-}, {
-  id: 'rock_armor_mid',
-  name: 'Rock Armor (Mid)',
-  color: '#9a9ca3',
-  desc: "Defends your most vital areas. Might keep your stomach safe. It's hard to breathe with rock on your chest though.",
-  inputs: [{
-    type: 'rocklands_soft',
-    count: 200
-  }],
-  output: {
-    type: 'rock_armor_mid',
-    count: 1
-  }
-}, {
-  id: 'rock_armor_bottom',
-  name: 'Rock Armor (Bottom)',
-  color: '#9a9ca3',
-  desc: "If only you could kick with these boots... Atleast you get exercise.",
-  inputs: [{
-    type: 'rocklands_soft',
-    count: 200
-  }],
-  output: {
-    type: 'rock_armor_bottom',
     count: 1
   }
 }, {
@@ -6836,6 +7036,19 @@ const CRAFTING_RECIPES = [{
     count: 1
   }
 }, {
+  id: 'rock_armor_mid',
+  name: 'Rock Armor (Mid)',
+  color: '#9a9ca3',
+  desc: "Defends your most vital areas. Might keep your stomach safe. It's hard to breathe with rock on your chest though.",
+  inputs: [{
+    type: 'rocklands_soft',
+    count: 200
+  }],
+  output: {
+    type: 'rock_armor_mid',
+    count: 1
+  }
+}, {
   id: 'glitch_armor_mid',
   name: 'Glitch Armor (Mid)',
   color: '#c266f2',
@@ -6846,19 +7059,6 @@ const CRAFTING_RECIPES = [{
   }],
   output: {
     type: 'glitch_armor_mid',
-    count: 1
-  }
-}, {
-  id: 'glitch_armor_bottom',
-  name: 'Glitch Armor (Bottom)',
-  color: '#c266f2',
-  desc: "These boots occasionally forget they're boots. Don't overthink it.",
-  inputs: [{
-    type: 'glitchlands_soft',
-    count: 200
-  }],
-  output: {
-    type: 'glitch_armor_bottom',
     count: 1
   }
 }, {
@@ -6878,6 +7078,19 @@ const CRAFTING_RECIPES = [{
   }],
   output: {
     type: 'rock_sword',
+    count: 1
+  }
+}, {
+  id: 'rock_armor_bottom',
+  name: 'Rock Armor (Bottom)',
+  color: '#9a9ca3',
+  desc: "If only you could kick with these boots... Atleast you get exercise.",
+  inputs: [{
+    type: 'rocklands_soft',
+    count: 200
+  }],
+  output: {
+    type: 'rock_armor_bottom',
     count: 1
   }
 }, {
@@ -6903,6 +7116,45 @@ const CRAFTING_RECIPES = [{
     count: 1
   }
 }, {
+  id: 'glitch_armor_bottom',
+  name: 'Glitch Armor (Bottom)',
+  color: '#c266f2',
+  desc: "These boots occasionally forget they're boots. Don't overthink it.",
+  inputs: [{
+    type: 'glitchlands_soft',
+    count: 200
+  }],
+  output: {
+    type: 'glitch_armor_bottom',
+    count: 1
+  }
+}, {
+  id: 'chest',
+  name: 'Chest',
+  color: '#6b4a2f',
+  desc: "Minimal storage for your extra crap, but the monsters love eating extra crap, so don't let the monsters eat the extra crap in your minimal storage for extra crap. Crap.",
+  inputs: [{
+    type: 'nullzone_soft',
+    count: 90
+  }, {
+    type: 'nullzone_strong',
+    count: 45
+  }, {
+    type: 'beachy_soft',
+    count: 90
+  }, {
+    type: 'beachy_strong',
+    count: 45
+  }, {
+    type: 'part_1_normal',
+    count: 15
+  }],
+  output: {
+    type: 'chest',
+    count: 1
+  },
+  horizonRequiredWave: 84
+}, {
   id: 'tidal_sword',
   name: 'Tidal Sword',
   color: '#3fa9c9',
@@ -6920,7 +7172,7 @@ const CRAFTING_RECIPES = [{
     type: 'tidalise_sturdy',
     count: 20
   }, {
-    type: 'part_5_normal', 
+    type: 'part_5_normal',
     count: 10
   }],
   output: {
@@ -6929,27 +7181,43 @@ const CRAFTING_RECIPES = [{
   },
   horizonRequiredWave: 500
 }, {
-  id: 'moonshine_mask',
-  name: 'Moonshine Mask',
-  color: '#3aa0e0',
-  desc: 'The Moon can make you feel lighter, or drunker, depending on your definition of Moonshine...',
-  inputs: [{
-    type: 'tidalise_soft',
-    count: 5
-  }, {
-    type: 'tidalise_solid',
-    count: 5
-  }, {
-    type: 'tidalise_strong',
-    count: 5
-  }, {
-    type: 'tidalise_sturdy',
-    count: 5
+  id: 'rainbonite_sword',
+  name: 'Rainbonite Sword',
+  color: '#c9c93f',
+  desc: "Every color that's ever come off a monster, ground down to an edge instead of a plate. Bridges the long quiet stretch between Normal and Deep.",
+  inputs: [...Array.from({
+    length: 12
+  }, (_, bIdx) => ({
+    type: `part_${bIdx}_normal`,
+    count: 15
+  })), {
+    type: 'stingerblade_normal',
+    count: 1
   }],
   output: {
-    type: 'moonshine_mask',
+    type: 'rainbonite_sword',
     count: 1
-  }
+  },
+  horizonRequiredWave: 1500
+}, {
+  id: 'bane_of_skins',
+  name: 'Bane of Skins',
+  color: '#8f2fae',
+  desc: "Every skin the Rainbonite Sword ever cut through, layered back on as an edge. Holds the line until Deep finally drops.",
+  inputs: [{
+    type: 'rainbonite_sword',
+    count: 1
+  }, ...Array.from({
+    length: 12
+  }, (_, bIdx) => ({
+    type: `part_${bIdx}_normal`,
+    count: 30
+  }))],
+  output: {
+    type: 'bane_of_skins',
+    count: 1
+  },
+  horizonRequiredWave: 3000
 }, {
   id: 'skyrite_wings',
   name: 'Skyrite Wings',
@@ -7000,56 +7268,6 @@ const CRAFTING_RECIPES = [{
     count: 1
   },
   horizonRequiredWave: 7092
-}, {
-  id: 'event_horizon',
-  name: 'Event Horizon',
-  color: '#000000',
-  desc: "The world trembles beneath your feet. Nothing can touch you. At the end of it all, the cycle just seems to continue in circles. Just like the accretion disk that orbits the Event Horizon. The monsters are unable to withstand your presence, and you're okay with that. At the end, the last thing to do is walk off into the distance and explore out to... The Horizon.",
-  inputs: [{
-    type: 'bloodheart_plate_blinding',
-    count: 1
-  }, {
-    type: 'emberstep_greaves_blinding',
-    count: 1
-  }, {
-    type: 'bulwark_core_blinding',
-    count: 1
-  }, {
-    type: 'stingerblade_blinding',
-    count: 1
-  }, {
-    type: 'mossbound_cleaver_blinding',
-    count: 1
-  }, {
-    type: 'phase_mantle_blinding',
-    count: 1
-  }, {
-    type: 'crystal_focus_blinding',
-    count: 1
-  }, {
-    type: 'aegis_shell_blinding',
-    count: 1
-  }, {
-    type: 'predators_mane_blinding',
-    count: 1
-  }, {
-    type: 'tuskbreaker_blinding',
-    count: 1
-  }, {
-    type: 'barbed_crown_blinding',
-    count: 1
-  }, {
-    type: 'pink_horizon_blinding',
-    count: 1
-  }, {
-    type: 'skyrite_wings',
-    count: 1
-  }],
-  output: {
-    type: 'event_horizon',
-    count: 1
-  },
-  horizonRequiredWave: 27917
 }, {
   id: 'eclipse_tusk',
   name: 'Eclipse Tusk',
@@ -7155,43 +7373,55 @@ const CRAFTING_RECIPES = [{
   },
   horizonRequiredWave: 27750
 }, {
-  id: 'rainbonite_sword',
-  name: 'Rainbonite Sword',
-  color: '#c9c93f',
-  desc: "Every color that's ever come off a monster, ground down to an edge instead of a plate. Bridges the long quiet stretch between Normal and Deep.",
-  inputs: [...Array.from({
-    length: 12
-  }, (_, bIdx) => ({
-    type: `part_${bIdx}_normal`,
-    count: 15
-  })), {
-    type: 'stingerblade_normal',
+  id: 'event_horizon',
+  name: 'Event Horizon',
+  color: '#000000',
+  desc: "The world trembles beneath your feet. Nothing can touch you. At the end of it all, the cycle just seems to continue in circles. Just like the accretion disk that orbits the Event Horizon. The monsters are unable to withstand your presence, and you're okay with that. At the end, the last thing to do is walk off into the distance and explore out to... The Horizon.",
+  inputs: [{
+    type: 'bloodheart_plate_blinding',
+    count: 1
+  }, {
+    type: 'emberstep_greaves_blinding',
+    count: 1
+  }, {
+    type: 'bulwark_core_blinding',
+    count: 1
+  }, {
+    type: 'stingerblade_blinding',
+    count: 1
+  }, {
+    type: 'mossbound_cleaver_blinding',
+    count: 1
+  }, {
+    type: 'phase_mantle_blinding',
+    count: 1
+  }, {
+    type: 'crystal_focus_blinding',
+    count: 1
+  }, {
+    type: 'aegis_shell_blinding',
+    count: 1
+  }, {
+    type: 'predators_mane_blinding',
+    count: 1
+  }, {
+    type: 'tuskbreaker_blinding',
+    count: 1
+  }, {
+    type: 'barbed_crown_blinding',
+    count: 1
+  }, {
+    type: 'pink_horizon_blinding',
+    count: 1
+  }, {
+    type: 'skyrite_wings',
     count: 1
   }],
   output: {
-    type: 'rainbonite_sword',
+    type: 'event_horizon',
     count: 1
   },
-  horizonRequiredWave: 1500
-}, {
-  id: 'bane_of_skins',
-  name: 'Bane of Skins',
-  color: '#8f2fae',
-  desc: "Every skin the Rainbonite Sword ever cut through, layered back on as an edge. Holds the line until Deep finally drops.",
-  inputs: [{
-    type: 'rainbonite_sword',
-    count: 1
-  }, ...Array.from({
-    length: 12
-  }, (_, bIdx) => ({
-    type: `part_${bIdx}_normal`,
-    count: 30
-  }))],
-  output: {
-    type: 'bane_of_skins',
-    count: 1
-  },
-  horizonRequiredWave: 3000
+  horizonRequiredWave: 27917
 }];
 
 const SWORD_STATS = {
@@ -7221,19 +7451,19 @@ const SWORD_STATS = {
   },
   glitch_sword: {
     dmg: 2000,
-    
+
     dmgPct: 0.60,
     dmgDecayStart: 125,
     dmgDecayEnd: 300
   },
   tidal_sword: {
-    dmg: 10000,
+    dmg: 15000,
     dmgPct: 0.30,
     dmgDecayStart: 500,
     dmgDecayEnd: 1500
   },
   rainbonite_sword: {
-    dmg: 50000,
+    dmg: 85000,
     dmgPct: 0.4444,
     dmgDecayStart: 1500,
     dmgDecayEnd: 3000
@@ -7284,10 +7514,10 @@ const SWORD_STATS = {
     thirdHitMult: 4
   },
   mossbound_cleaver_normal: {
-    dmg: 0,
+    dmg: 3000,
     dmgPct: 0.6667,
     dmgDecayStart: 334,
-    dmgDecayEnd: 604,
+    dmgDecayEnd: 500,
     thirdHitMult: 2,
     resetOnKill: true
   },
@@ -7324,39 +7554,39 @@ const SWORD_STATS = {
     resetOnKill: true
   },
   tuskbreaker_normal: {
-    dmg: 0,
+    dmg: 40000,
     dmgPct: 0.3667,
     dmgDecayStart: 751,
-    dmgDecayEnd: 4751,
-    knockbackPct: 0.20
+    dmgDecayEnd: 1100,
+    knockbackPct: 0.05
   },
   tuskbreaker_deep: {
-    dmg: 0,
+    dmg: 40000,
     dmgPct: 0.2813,
     dmgDecayStart: 4751,
     dmgDecayEnd: 7751,
-    knockbackPct: 0.225
+    knockbackPct: 0.06
   },
   tuskbreaker_dark: {
-    dmg: 0,
+    dmg: 40000,
     dmgPct: 0.3113,
     dmgDecayStart: 7751,
     dmgDecayEnd: 10751,
-    knockbackPct: 0.25
+    knockbackPct: 0.07
   },
   tuskbreaker_bright: {
-    dmg: 0,
+    dmg: 40000,
     dmgPct: 0.5320,
     dmgDecayStart: 24751,
     dmgDecayEnd: 27751,
-    knockbackPct: 0.30
+    knockbackPct: 0.08
   },
   tuskbreaker_blinding: {
-    dmg: 0,
+    dmg: 40000,
     dmgPct: 0.1667,
     dmgDecayStart: 27751,
     dmgDecayEnd: null,
-    knockbackPct: 0.40
+    knockbackPct: 0.10
   }
 };
 const HORIZON_TIER_ORDER = ['normal', 'deep', 'dark', 'bright', 'blinding'];
@@ -7493,18 +7723,18 @@ const HORIZON_ITEMS = [{
     },
     bright: {
       requiredWave: 24084,
-      effect: '2.1x movement speed. +65% acceleration. Ignores terrain slowdown.',
+      effect: '2.3x movement speed. +65% acceleration. Ignores terrain slowdown.',
       stats: {
-        speedMult: 2.1,
+        speedMult: 2.3,
         accelPct: 0.65,
         ignoreTerrainSlow: true
       }
     },
     blinding: {
       requiredWave: 27084,
-      effect: '2.4x movement speed. +80% acceleration. Ignores terrain slowdown. Brief invulnerability when changing direction sharply.',
+      effect: '2.75x movement speed. +80% acceleration. Ignores terrain slowdown. Brief invulnerability when changing direction sharply.',
       stats: {
-        speedMult: 2.4,
+        speedMult: 2.75,
         accelPct: 0.80,
         ignoreTerrainSlow: true,
         turnInvuln: true
@@ -7639,7 +7869,7 @@ const HORIZON_ITEMS = [{
     normal: {
       requiredWave: 334,
       effect: '6.7% of target max HP per hit, tapering to 0% by Wave 4,334. Every 3rd hit x2. Kill resets 3rd-hit counter.'
-      
+
     },
     deep: {
       requiredWave: 4334,
@@ -7704,22 +7934,24 @@ const HORIZON_ITEMS = [{
     },
     bright: {
       requiredWave: 24417,
-      effect: '0.2x gravity. 60% slower falling. Brief mid-air dash. Immune to fall damage.',
+      effect: '0.15x gravity. 60% slower falling. 1.5x jump height. Brief mid-air dash. Immune to fall damage.',
       stats: {
-        gravityMult: 0.2,
+        gravityMult: 0.15,
         fallSlowPct: 0.60,
         midairDashes: 1,
-        fallImmune: true
+        fallImmune: true,
+        jumpHeightMult: 1.5
       }
     },
     blinding: {
       requiredWave: 27417,
-      effect: '0.1x gravity. 75% slower falling. Two mid-air dashes. Immune to fall damage.',
+      effect: '0.05x gravity. 75% slower falling. 2x jump height. Two mid-air dashes. Immune to fall damage.',
       stats: {
-        gravityMult: 0.1,
+        gravityMult: 0.05,
         fallSlowPct: 0.75,
         midairDashes: 2,
-        fallImmune: true
+        fallImmune: true,
+        jumpHeightMult: 2.0
       }
     }
   }
@@ -7928,24 +8160,24 @@ const HORIZON_ITEMS = [{
   tiers: {
     normal: {
       requiredWave: 751,
-      effect: '6.7% of target max HP per hit, tapering to 0% by Wave 4,751. +20% knockback.'
-      
+      effect: '40,000 base damage plus 6.7% of target max HP per hit, tapering to 0% by Wave 1,100. +5% knockback.'
+
     },
     deep: {
       requiredWave: 4751,
-      effect: '8.1% of target max HP per hit, tapering to 0% by Wave 7,751. +22.5% knockback.'
+      effect: '40,000 base damage plus 8.1% of target max HP per hit, tapering to 0% by Wave 7,751. +6% knockback.'
     },
     dark: {
       requiredWave: 7751,
-      effect: '11.1% of target max HP per hit, tapering to 0% by Wave 24,751. +25% knockback.'
+      effect: '40,000 base damage plus 11.1% of target max HP per hit, tapering to 0% by Wave 24,751. +7% knockback.'
     },
     bright: {
       requiredWave: 24751,
-      effect: '23.2% of target max HP per hit, tapering to 0% by Wave 27,751. +30% knockback.'
+      effect: '40,000 base damage plus 23.2% of target max HP per hit, tapering to 0% by Wave 27,751. +8% knockback.'
     },
     blinding: {
       requiredWave: 27751,
-      effect: '46.7% of target max HP per hit, permanently. +40% knockback.'
+      effect: '40,000 base damage plus 46.7% of target max HP per hit, permanently. +10% knockback.'
     }
   }
 }, {
@@ -8081,6 +8313,7 @@ const HORIZON_ITEMS = [{
     }
   }
 }];
+
 HORIZON_ITEMS.forEach((hItem, hIdx) => {
   for (const tier of HORIZON_TIER_ORDER) {
     const t = hItem.tiers[tier];
@@ -8173,7 +8406,7 @@ const SCALED_ARMOR_TIERS = {
       type: 'tidalise_sturdy',
       count: 20
     }, {
-      type: 'part_5_normal', 
+      type: 'part_5_normal',
       count: 10
     }]
   },
@@ -8326,7 +8559,7 @@ function armorItem(type) {
     type
   };
 }
-// Computes a sword's %-max-HP hit, decaying it by wave progress, halving per skip-level doubling, then reducing further against bosses and superbosses.
+
 function wpnDmgPct(wep, wave, target) {
   const stats = wep.stats;
   if (!stats || !stats.dmgPct) return 0;
@@ -8435,14 +8668,26 @@ function tickDrain(dt) {
   }
 }
 
-function groundSmash(x, z, fallDistance) {
-  const radius = Math.min(GROUND_SMASH_MAX_RADIUS, GROUND_SMASH_BASE_RADIUS + fallDistance * GROUND_SMASH_RADIUS_PER_FALL_UNIT);
-  const pct = (EVENT_HORIZON_MERGED_STATS && EVENT_HORIZON_MERGED_STATS.dmgPct) || GROUND_SMASH_FALLBACK_PCT;
+function groundSmash(x, z, fallDistance, powerMult = 1) {
+  const radius = Math.min(GROUND_SMASH_MAX_RADIUS, GROUND_SMASH_BASE_RADIUS + fallDistance * GROUND_SMASH_RADIUS_PER_FALL_UNIT) * powerMult;
+  const pct = ((EVENT_HORIZON_MERGED_STATS && EVENT_HORIZON_MERGED_STATS.dmgPct) || GROUND_SMASH_FALLBACK_PCT) * powerMult;
   for (const m of monsters) {
     if (m.hp <= 0) continue;
     const dx = m.x - x,
       dz = m.z - z;
-    if (Math.hypot(dx, dz) <= radius) m.hp -= m.maxHp * pct;
+    const dlen = Math.hypot(dx, dz);
+    if (dlen <= radius) {
+      m.hp -= m.maxHp * pct;
+      if (dlen > 0) {
+        m.state = 'knockback';
+        m.kbFromX = m.x;
+        m.kbFromZ = m.z;
+        m.kbT = 0;
+        const kbDist = monsterKnockbackDist(m, MONSTER_KNOCKBACK_DIST);
+        m.kbToX = m.x + dx / dlen * kbDist;
+        m.kbToZ = m.z + dz / dlen * kbDist;
+      }
+    }
   }
   spawnHitFx(x, feetY, z, radius, 'smash');
 }
@@ -8621,6 +8866,7 @@ const craftOverlayEl = document.getElementById('craftOverlay');
 const craftListEl = document.getElementById('craftList');
 const craftDetailEl = document.getElementById('craftDetail');
 const craftPromptEl = document.getElementById('craftPrompt');
+const chestMineDenyEl = document.getElementById('chestMineDeny');
 let craftOpen = false;
 let selectedRecipeId = CRAFTING_RECIPES.length ? CRAFTING_RECIPES[0].id : null;
 function invCount(type) {
@@ -8891,26 +9137,26 @@ async function runEndgameCutscene() {
   cutsceneTextEl.style.opacity = '0';
   await cutTitle('THE HORIZON', 2.6);
   await cutLine('You have spent a long time looking.');
-  await cutLine('At first, there was not much to see.');
+  await cutLine('At first, there was not much to see;');
   setView(4);
   cutSpinDegS = 10;
   await cutFade('#000', 0, 2.6);
-  await cutLine('A small piece of land.');
-  await cutLine('A few colors.');
-  await cutLine('A few creatures that came when the sun went down.');
+  await cutLine('A small piece of land,');
+  await cutLine('A few colors,');
+  await cutLine('A few creatures that came when the sun went down...');
   await cutLine('So you built.');
-  await cutLine('You mined.');
-  await cutLine('You fought.');
-  await cutLine('And you looked farther.');
+  await cutLine('You mined,');
+  await cutLine('You fought,');
+  await cutLine('And you looked farther!');
   setView(6);
   await cutLine('The world kept giving you more.');
-  await cutLine('More colors.');
-  await cutLine('More creatures.');
+  await cutLine('More colors,');
+  await cutLine('More creatures,');
   await cutLine('More nights.');
-  await cutLine('Wave after wave after wave.');
+  await cutLine('Wave after wave...');
   await cutLine('You thought you were progressing.');
-  await cutLine("You weren't.");
-  const fovUpLines = ['You were approaching.', 'There was always something beyond the last thing you could see.'];
+  await cutLine("You weren't-");
+  const fovUpLines = ['You were approaching...', 'There was always something beyond the last thing you could see.'];
   const fovRampUp = cutFovTo(360, linesDuration(fovUpLines));
   await cutLine(fovUpLines[0]);
   await cutLine(fovUpLines[1]);
@@ -8924,56 +9170,56 @@ async function runEndgameCutscene() {
   await cutLine('the Horizon.');
   cutFovTo(75, 4);
   const fadeBlackLines = [
-    'You were never told what was there.',
+    'You were never told what was there;',
     'You simply assumed there had to be something.',
-    "There wasn't.",
-    'Not in the way you expected.',
+    "There wasn't,",
+    'Atleast not in the way you expected.',
     'The colors began to change.',
-    'They grew deeper.',
+    'They grew deeper,',
     'Then darker.'
   ];
   const fadeToBlackBG = cutFade('#000', 1, linesDuration(fadeBlackLines));
   for (const line of fadeBlackLines) await cutLine(line);
   await fadeToBlackBG;
-  await cutLine('Then brighter.');
+  await cutLine('Then brighter!');
   await cutFade('#000', 0, 2.2);
-  await cutLine('Until brightness itself stopped meaning what it used to.');
+  await cutLine('Brighter until brightness itself stopped meaning what it used to.');
   await cutLine('You reached Blinding.');
   await cutFade('#fff', 1, 2.2);
-  await cutLine('By then, you could no longer tell whether the light was coming from the world...');
+  await cutLine('By then you could no longer tell whether the light was coming from the world...');
   await cutLine('or from you.');
   await cutLine('The things that once hunted you could no longer touch you.');
   await cutLine('The things that once seemed impossible to kill simply disappeared when you approached them.');
   await cutFade('#fff', 0, 2.2);
-  await cutLine("You had reached the end of the world's progression.");
-  await cutLine('And still...');
-  await cutLine('you could see farther.');
+  await cutLine("You have reached the end of the world's progression.");
+  await cutLine('Yet...');
+  await cutLine('You could see farther.');
   await cutLine('So you made the Event Horizon.');
   await cutLine('You expected it to be a weapon.');
   await cutLine('It was not.');
   await cutLine('It was a window.');
   await cutLine('For the first time, you could see the whole thing.');
-  const spinUpLines = ['The waves.', 'The colors.', 'The nights.', 'The world.', 'All of it turning.', 'Again.', 'And again.', 'And again.'];
+  const spinUpLines = ['The waves,', 'The colors,', 'The nights,', 'The world.', 'All of it turning.', 'Again...', 'And again...', 'And again.....'];
   const spinRampUp = cutSpinTo(360, linesDuration(spinUpLines));
   for (const line of spinUpLines) await cutLine(line);
   await spinRampUp;
   await Promise.all([cutSpinTo(0, 0.8), cutPitchTo(-Math.PI / 2 + 0.02, 1.0)]);
   await cutLine('A cycle with no beginning you could find, and no ending you could reach.');
-  await cutLine('You finally understood.');
+  await cutLine('You finally understood;');
   await cutLine('The Horizon was never the edge of the world.');
   await cutLine('It was the edge of what the world allowed you to see.');
-  await cutLine('And now you can see beyond it.');
+  await cutLine('And now you can see beyond it!');
   setView(22);
   setClouds(false);
   const climb1 = cutClimb(100000, 9);
-  await cutLine('There is no wall.');
-  await cutLine('No final monster.');
+  await cutLine('There is no wall,');
+  await cutLine('No final monster,');
   await cutLine('No final wave.');
-  await cutLine('Nothing waiting for you at the end.');
-  await cutLine('Only more distance.');
-  await cutLine('More darkness.');
+  await cutLine('Nothing waiting for you at the end;');
+  await cutLine('Only more distance,');
+  await cutLine('More darkness,');
   await cutFade('#000', 1, 1.8);
-  await cutLine('More light.');
+  await cutLine('More light,');
   await cutFade('#000', 0, 1.8);
   await climb1;
   await cutLine('More world.');
@@ -8990,7 +9236,7 @@ async function runEndgameCutscene() {
   await cutLine('Walk.');
   await cutLine('Keep looking.');
   await cutLine('And see how far the world really goes.');
-  await cutLine('The Horizon awaits.');
+  await cutLine('The Horizon awaits!');
   setView(origViewLevel);
   applyFov(origFov);
   setClouds(origClouds);
@@ -9137,7 +9383,7 @@ const runCmd = prof("runCmd", function runCmd(raw) {
     toggleDev();
     consoleLog(devMode ? 'Dev mode ON — flight/noclip/infinite resources/instant mining.' : 'Dev mode OFF.', 'line-info');
   } else if (word === 'help') {
-    consoleLog('Commands: perf <seconds> (set performance log interval, 0 = off), perf (log stats now), functions <seconds> (profile every tracked function for N seconds: call count + total/avg ms), forcesave (save the game immediately), clear (clear console), help.', 'line-info');
+    consoleLog('Commands: perf <seconds> (set performance log interval, 0 = off), perf (log stats now), functions <seconds> (profile every tracked function for N seconds: call count + total/avg ms), forcesave (save the game immediately), forcecheater (force the anti-cheat flag on for testing), clear (clear console), help.', 'line-info');
   } else if (word === 'clear') {
     devConsoleOutputEl.textContent = '';
   } else if (word === 'forcesave') {
@@ -9166,6 +9412,12 @@ const runCmd = prof("runCmd", function runCmd(raw) {
       rendCraftDetail();
       consoleLog(`Wave set to ${currentWave}.`, 'line-info');
     }
+  } else if (word === 'forcecheater') {
+    isCheater = true;
+    cheatRevertWave = currentWave;
+    cheatReloadTimestamps = [];
+    save();
+    consoleLog(`Cheater flag forced ON (revert wave ${cheatRevertWave}). Damage zeroed, monsters ${CHEATER_STAT_MULT}x stats/speed — dying clears it.`, 'line-info');
   } else if (word === 'give') {
     if (rest.length === 0) {
       const allTypes = ALL_ITEM_TYPES.concat(Object.keys(DEV_ITEM_META));
@@ -9278,7 +9530,7 @@ let miningColKey = null,
   miningDuration = 0;
 
 const TRIANGLE_MINE_SPEED_PER_HARDNESS = 0.003;
-// A held raw triangle's mining speed comes from its material hardness scaled by the inverse of its home biome's terrain mine-speed multiplier.
+
 function heldTriangleMiningMult(type) {
   const hardness = MATERIAL_HARDNESS[type];
   if (hardness === undefined) return 1;
@@ -9313,39 +9565,41 @@ function miningSpeedMult() {
 
 function computePlayerStats() {
   const wave = typeof currentWave === 'number' ? currentWave : 0;
-  const breakdown = { speed: [], gravity: [], jump: [], atk: [], defense: [], miningSpeed: [], hpRegen: [] };
+  const breakdown = { speed: [], gravity: [], jump: [], atk: [], defense: [], miningSpeed: [], hpRegen: [], hp: [], special: [] };
 
   let speedMult = 1;
   const gildBottomTier = equipped('gildBottom');
   if (equipment.gildBottom && equipment.gildBottom.type === 'sunshine_breeze') {
-    speedMult = 2;
-    breakdown.speed.push({ name: itemName('sunshine_breeze'), value: 'x2.00' });
+    speedMult = 1.6;
+    breakdown.speed.push({ name: itemName('sunshine_breeze'), value: 'x1.60' });
   } else if (gildBottomTier && gildBottomTier.stats.speedMult !== undefined) {
     speedMult = gildBottomTier.stats.speedMult;
-    breakdown.speed.push({ name: itemName(equipment.gildBottom.type), value: `x${speedMult.toFixed(2)}` });
+
+    breakdown.speed.push({ name: itemName(gildBottomTier.type), value: `x${speedMult.toFixed(2)}` });
   }
   const predatorsMane = equipped('armorBottom');
   if (predatorsMane && predatorsMane.stats.speedBonusPct !== undefined) {
-    breakdown.speed.push({ name: itemName(equipment.armorBottom.type) + ' (sprint)', value: `+${(predatorsMane.stats.speedBonusPct * 100).toFixed(0)}%` });
+    breakdown.speed.push({ name: itemName(predatorsMane.type) + ' (sprint)', value: `+${(predatorsMane.stats.speedBonusPct * 100).toFixed(0)}%` });
   }
 
   let gravityMult = 1;
   const maskEquipped = equipment.gildTop && equipment.gildTop.type === 'moonshine_mask';
   const phaseMantle = equipped('gildTop');
   if (maskEquipped) {
-    gravityMult = 0.5;
-    breakdown.gravity.push({ name: itemName('moonshine_mask'), value: 'x0.50' });
+    gravityMult = 0.65;
+    breakdown.gravity.push({ name: itemName('moonshine_mask'), value: 'x0.65' });
   } else if (phaseMantle && phaseMantle.stats.gravityMult !== undefined) {
     gravityMult = phaseMantle.stats.gravityMult;
-    breakdown.gravity.push({ name: itemName(equipment.gildTop.type), value: `x${gravityMult.toFixed(2)}` });
+    breakdown.gravity.push({ name: itemName(phaseMantle.type), value: `x${gravityMult.toFixed(2)}` });
   }
 
   const wingsEquipped = equipment.gildMid && equipment.gildMid.type === 'skyrite_wings';
   const barbedCrown = equipped('gildMid');
   const maxJumps = wingsEquipped ? 3 : barbedCrown && barbedCrown.stats.maxJumps !== undefined ? barbedCrown.stats.maxJumps : 1;
-  const jumpHeightMult = maskEquipped ? 2 : 1;
-  if (wingsEquipped) breakdown.jump.push({ name: itemName('skyrite_wings'), value: `${maxJumps} jumps` });else if (barbedCrown && barbedCrown.stats.maxJumps !== undefined) breakdown.jump.push({ name: itemName(equipment.gildMid.type), value: `${maxJumps} jumps` });
-  if (maskEquipped) breakdown.jump.push({ name: itemName('moonshine_mask'), value: 'x2.00 height' });
+  let jumpHeightMult = 1;
+  if (maskEquipped) jumpHeightMult = 1.6;else if (phaseMantle && phaseMantle.stats.jumpHeightMult !== undefined) jumpHeightMult = phaseMantle.stats.jumpHeightMult;
+  if (wingsEquipped) breakdown.jump.push({ name: itemName('skyrite_wings'), value: `${maxJumps} jumps` });else if (barbedCrown && barbedCrown.stats.maxJumps !== undefined) breakdown.jump.push({ name: itemName(barbedCrown.type), value: `${maxJumps} jumps` });
+  if (maskEquipped) breakdown.jump.push({ name: itemName('moonshine_mask'), value: 'x1.60 height' });else if (phaseMantle && phaseMantle.stats.jumpHeightMult !== undefined) breakdown.jump.push({ name: itemName(phaseMantle.type), value: `x${jumpHeightMult.toFixed(2)} height` });
 
   const heldSlot = typeof inventory !== 'undefined' ? inventory[selectedHotbarIndex] : null;
   const ehActive = typeof isActive === 'function' && isActive();
@@ -9353,11 +9607,23 @@ function computePlayerStats() {
   const baseAtk = atkDmg();
 
   let atkBonusPct = 0;
-  for (const slotName of ['armorTop', 'armorMid', 'armorBottom', 'gildTop', 'gildMid', 'gildBottom']) {
-    const eq = equipped(slotName);
-    if (eq && eq.stats && eq.stats.atkBonusPct) {
-      atkBonusPct += eq.stats.atkBonusPct;
-      breakdown.atk.push({ name: itemName(equipment[slotName].type), value: `+${(eq.stats.atkBonusPct * 100).toFixed(0)}%` });
+  if (ehActive) {
+
+    const eh = mergedItem();
+    if (eh.stats && eh.stats.atkBonusPct) {
+      atkBonusPct += eh.stats.atkBonusPct;
+      breakdown.atk.push({ name: itemName(eh.type), value: `+${(eh.stats.atkBonusPct * 100).toFixed(0)}%` });
+    }
+  } else {
+    for (const slotName of ['armorTop', 'armorMid', 'armorBottom', 'gildTop', 'gildMid', 'gildBottom']) {
+      const eq = equipped(slotName);
+      if (eq && eq.stats && eq.stats.atkBonusPct) {
+
+        let displayBonusPct = eq.stats.atkBonusPct;
+        if (slotName === 'armorTop' && typeof waveSkipMult === 'number' && waveSkipMult > 1) displayBonusPct /= waveSkipMult;
+        atkBonusPct += displayBonusPct;
+        breakdown.atk.push({ name: itemName(eq.type), value: `+${(displayBonusPct * 100).toFixed(0)}%` });
+      }
     }
   }
   let weaponPct = 0;
@@ -9403,6 +9669,88 @@ function computePlayerStats() {
     if (h && h.stats && h.stats.hpRegenPct) breakdown.hpRegen.push({ name: itemName(eq.type), value: `+${(h.stats.hpRegenPct * 100).toFixed(2)}%/s` });
   }
 
+  let devArmorEquipped = false;
+  for (const slotName of ['armorTop', 'armorMid', 'armorBottom']) {
+    const eq = equipment[slotName];
+    if (!eq) continue;
+    if (eq.type.indexOf('dev_armor_') === 0) {
+      devArmorEquipped = true;
+      breakdown.hp.push({ name: itemName(eq.type), value: '\u221e' });
+      continue;
+    }
+    if (eq.type.indexOf('rock_armor_') === 0) {
+      breakdown.hp.push({ name: itemName(eq.type), value: `+${ARMOR_HP_BONUS.rock}` });
+    } else if (eq.type.indexOf('glitch_armor_') === 0) {
+      breakdown.hp.push({ name: itemName(eq.type), value: `+${ARMOR_HP_BONUS.glitch}` });
+    } else if (typeof armorItem === 'function' && armorItem(eq.type)) {
+      const b = armorItem(eq.type).tier.hpBonus;
+      if (b) breakdown.hp.push({ name: itemName(eq.type), value: `+${b}` });
+    } else {
+      const h = itemFromType(eq.type);
+      if (h && h.stats && h.stats.hpBonus) breakdown.hp.push({ name: itemName(eq.type), value: `+${h.stats.hpBonus}` });
+    }
+  }
+  if (ehActive && EVENT_HORIZON_MERGED_STATS.hpBonus) {
+    breakdown.hp.push({ name: itemName('event_horizon'), value: `+${EVENT_HORIZON_MERGED_STATS.hpBonus}` });
+  }
+  const maxHp = devArmorEquipped ? Infinity : curMaxHp();
+
+  const SPECIAL_COVERED_KEYS = new Set(['speedMult', 'speedBonusPct', 'gravityMult', 'jumpHeightMult', 'maxJumps', 'atkBonusPct', 'miningSpeedMult', 'hpRegenPct', 'hpBonus', 'dmgPct', 'dmg', 'pctMaxHp', 'dmgDecayStart', 'dmgDecayEnd']);
+  const SPECIAL_STAT_FORMAT = {
+    saveCooldown: v => `Emergency save every ${v}s`,
+    saveSpeedBurst: v => v ? 'Save grants speed burst' : null,
+    accelPct: v => `+${(v * 100).toFixed(0)}% accel`,
+    ignoreTerrainSlow: v => v ? 'Ignores terrain slowdown' : null,
+    landBurst: v => v ? 'Speed burst on landing' : null,
+    turnInvuln: v => v ? 'Brief invuln on sharp turn' : null,
+    capPct: v => `Dmg capped at ${(v * 100).toFixed(0)}% max HP`,
+    healPctOfExcess: v => `Heals ${(v * 100).toFixed(0)}% of excess dmg`,
+    fallImmune: v => v ? 'Immune to fall damage' : null,
+    fallSlowPct: v => `Fall speed -${(v * 100).toFixed(0)}%`,
+    midairDashes: v => `${v} midair dash${v === 1 ? '' : 'es'}`,
+    onHitAtkImmunity: v => v ? 'Brief invuln on hit' : null,
+    onHitSpeedBurst: v => v ? 'Speed burst on hit' : null,
+    negateCount: v => `Negates ${v} hit${v === 1 ? '' : 's'} per window`,
+    negateInterval: v => `Hit negation every ${v}s`,
+    stunOnNegate: v => v ? 'Stuns attacker on negate' : null,
+    immunityOnEnter: v => v ? 'Immune on proximity entry' : null,
+    knockbackImmune: v => v ? 'Knockback immune' : null,
+    range: v => `${v}u proximity range`,
+    aoeInvuln: v => v ? 'Invuln on final-jump AOE' : null,
+    aoeKnockback: v => v ? 'AOE knockback on final jump' : null,
+    slowFallFinal: v => v ? 'Slow fall on final jump' : null,
+    immuneDur: v => `${v}s immunity window`,
+    immuneInterval: v => `Immunity every ${v}s`,
+    negatesKnockback: v => v ? 'Negates knockback' : null,
+    healPct: v => `Heals ${(v * 100).toFixed(0)}% max HP on immunity`,
+    thirdHitMult: v => `x${v} every 3rd hit`,
+    knockbackPct: v => `+${(v * 100).toFixed(0)}% knockback`,
+    resetOnKill: v => v ? 'Kill resets hit counter' : null
+  };
+  function pushSpecial(name, stats) {
+    if (!stats) return;
+    const parts = [];
+    for (const key in stats) {
+      if (SPECIAL_COVERED_KEYS.has(key)) continue;
+      const fmt = SPECIAL_STAT_FORMAT[key];
+      if (!fmt) continue;
+      const text = fmt(stats[key]);
+      if (text) parts.push(text);
+    }
+    if (parts.length) breakdown.special.push({ name, value: parts.join(', ') });
+  }
+  if (ehActive) {
+    pushSpecial(itemName('event_horizon'), EVENT_HORIZON_MERGED_STATS);
+  } else {
+    for (const slotName of EQUIP_SLOTS) {
+      const eq = equipment[slotName];
+      if (!eq) continue;
+      const h = itemFromType(eq.type);
+      if (h && h.stats) pushSpecial(itemName(eq.type), h.stats);
+    }
+  }
+  if (!ehActive && wep && wep.stats) pushSpecial(wep.item ? wep.item.name : itemName(heldSlot && heldSlot.type), wep.stats);
+
   return {
     speed: BASE_SPEED * SPRINT_MULT * speedMult,
     gravity: GRAVITY * gravityMult,
@@ -9413,6 +9761,7 @@ function computePlayerStats() {
     defensePct,
     miningSpeedMult: mineMult,
     hpRegenPctPerSec: regenPct,
+    maxHp,
     breakdown
   };
 }
@@ -9430,7 +9779,12 @@ function fmtBreakdown(items) {
 const rendPlayerStats = prof("rendPlayerStats", function rendPlayerStats() {
   if (!psBodyEl || psCollapsed || typeof equipment === 'undefined') return;
   const s = computePlayerStats();
-  psBodyEl.innerHTML = `<div class="psRow"><span>Speed</span><b>${s.speed.toFixed(2)}</b></div>` + fmtBreakdown(s.breakdown.speed) + `<div class="psRow"><span>Gravity</span><b>${s.gravity.toFixed(1)}</b></div>` + fmtBreakdown(s.breakdown.gravity) + `<div class="psRow"><span>Jump</span><b>x${s.jumpHeightMult.toFixed(2)} / ${s.maxJumps}x</b></div>` + fmtBreakdown(s.breakdown.jump) + `<div class="psRow"><span>Base Atk</span><b>${s.baseAtk.toFixed(1)}</b></div>` + `<div class="psRow"><span>Atk Bonus</span><b>+${(s.atkBonusPct * 100).toFixed(0)}%</b></div>` + fmtBreakdown(s.breakdown.atk) + `<div class="psRow"><span>Defense</span><b>${s.defensePct.toFixed(1)}%</b></div>` + fmtBreakdown(s.breakdown.defense) + `<div class="psRow"><span>Mining Spd</span><b>x${s.miningSpeedMult.toFixed(2)}</b></div>` + fmtBreakdown(s.breakdown.miningSpeed) + `<div class="psRow"><span>HP Regen</span><b>${(s.hpRegenPctPerSec * 100).toFixed(2)}%/s</b></div>` + fmtBreakdown(s.breakdown.hpRegen);
+  psBodyEl.innerHTML = `<div class="psRow"><span>Speed</span><b>${s.speed.toFixed(2)}</b></div>` + fmtBreakdown(s.breakdown.speed) + `<div class="psRow"><span>Gravity</span><b>${s.gravity.toFixed(1)}</b></div>` + fmtBreakdown(s.breakdown.gravity) + `<div class="psRow"><span>Jump</span><b>x${s.jumpHeightMult.toFixed(2)} / ${s.maxJumps}x</b></div>` + fmtBreakdown(s.breakdown.jump) + `<div class="psRow"><span>Base Atk</span><b>${s.baseAtk.toFixed(1)}</b></div>` + `<div class="psRow"><span>Atk Bonus</span><b>+${(s.atkBonusPct * 100).toFixed(0)}%</b></div>` + fmtBreakdown(s.breakdown.atk) + `<div class="psRow"><span>Defense</span><b>${s.defensePct.toFixed(1)}%</b></div>` + fmtBreakdown(s.breakdown.defense) + `<div class="psRow"><span>Max HP</span><b>${s.maxHp === Infinity ? '\u221e' : s.maxHp.toFixed(0)}</b></div>` + fmtBreakdown(s.breakdown.hp) + `<div class="psRow"><span>Mining Spd</span><b>x${s.miningSpeedMult.toFixed(2)}</b></div>` + fmtBreakdown(s.breakdown.miningSpeed) + `<div class="psRow"><span>HP Regen</span><b>${(s.hpRegenPctPerSec * 100).toFixed(2)}%/s</b></div>` + fmtBreakdown(s.breakdown.hpRegen) + (s.breakdown.special.length ? `<div class="psRow"><span>Special</span></div>` + fmtBreakdown(s.breakdown.special) : '');
+});
+const tickAttackHold = prof("tickAttackHold", function tickAttackHold(dt) {
+  if (attackHoldCooldown > 0) attackHoldCooldown = Math.max(0, attackHoldCooldown - dt);
+  if (!atkHeld || document.pointerLockElement !== canvas || attackHoldCooldown > 0) return;
+  if (atkCursor()) attackHoldCooldown = ATTACK_HOLD_INTERVAL;
 });
 const tickMining = prof("tickMining", function tickMining(dt) {
   const hit = document.pointerLockElement === canvas && mouseDown ? pickMine() : null;
@@ -9440,8 +9794,57 @@ const tickMining = prof("tickMining", function tickMining(dt) {
       miningElapsed = 0;
       setMineUI(0);
     }
+    chestMineDenyEl.style.display = 'none';
     return;
   }
+  if (hit.object.userData && hit.object.userData.isChest) {
+    const chest = chests.find(c => c.id === hit.object.userData.chestId);
+    if (!chest) {
+      if (miningColKey !== null) {
+        miningColKey = null;
+        miningElapsed = 0;
+        setMineUI(0);
+      }
+      chestMineDenyEl.style.display = 'none';
+      return;
+    }
+    const chestEmpty = chest.slots.every(s => !s);
+    if (!chestEmpty) {
+      if (miningColKey !== null) {
+        miningColKey = null;
+        miningElapsed = 0;
+        setMineUI(0);
+      }
+      chestMineDenyEl.style.display = 'block';
+      return;
+    }
+    chestMineDenyEl.style.display = 'none';
+    if (devMode) {
+      destroyChest(chest.id);
+      grantHotbar('chest', 1);
+      miningColKey = null;
+      miningElapsed = 0;
+      setMineUI(0);
+      return;
+    }
+    const key = 'chest:' + chest.id;
+    if (key !== miningColKey) {
+      miningColKey = key;
+      miningElapsed = 0;
+      miningDuration = CHEST_MINE_SECONDS / miningSpeedMult();
+    }
+    miningElapsed += dt;
+    setMineUI(Math.min(1, miningElapsed / miningDuration));
+    if (miningElapsed >= miningDuration) {
+      destroyChest(chest.id);
+      grantHotbar('chest', 1);
+      miningColKey = null;
+      miningElapsed = 0;
+      setMineUI(0);
+    }
+    return;
+  }
+  chestMineDenyEl.style.display = 'none';
   const hardness = terrainHard(hit.point.x, hit.point.y, hit.point.z);
   if (hardness >= MAX_HARDNESS) {
     if (miningColKey !== null) {
@@ -9505,7 +9908,8 @@ const carveSphere = prof("carveSphere", function carveSphere(hx, hy, hz) {
         if (dist > R + step) continue;
         if (wy < bedrockY) continue;
         const key = densKey(i, j, k);
-        const current = densityEdits.has(key) ? densityEdits.get(key) : naturalY - wy;
+
+        const current = densityEdits.has(key) ? densityEdits.get(key) : densAt(wx, wy, wz, naturalY);
         const carved = dist - R;
         const next = Math.min(current, carved);
         if (next === current) continue;
@@ -9567,7 +9971,8 @@ const placeSphere = prof("placeSphere", function placeSphere(hx, hy, hz, hardnes
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (dist > R + step) continue;
         const key = densKey(i, j, k);
-        const current = densityEdits.has(key) ? densityEdits.get(key) : naturalY - wy;
+
+        const current = densityEdits.has(key) ? densityEdits.get(key) : densAt(wx, wy, wz, naturalY);
         const placedDensity = R - dist;
         const next = Math.max(current, placedDensity);
         if (next === current) continue;
@@ -9650,7 +10055,8 @@ const nearestSolid = prof("nearestSolid", function nearestSolid(hx, hy, hz, maxS
           const wy = j * step;
           if (wy < bedrockY) continue;
           const key = densKey(i, j, k);
-          const density = densityEdits.has(key) ? densityEdits.get(key) : naturalY - wy;
+
+          const density = densityEdits.has(key) ? densityEdits.get(key) : densAt(wx, wy, wz, naturalY);
           if (density <= 0) continue;
           const dist = Math.hypot(wx - hx, wy - hy, wz - hz);
           if (dist < bestDist) {
@@ -9706,6 +10112,11 @@ const finishPlace = prof("finishPlace", function finishPlace(px, py, pz) {
   const type = devMode ? slot ? slot.type : DEV_DEFAULT_MATERIAL : slot && slot.count > 0 ? slot.type : null;
   if (!type) return;
 
+  if (type === 'chest') {
+    takeHotbar(selectedHotbarIndex, 1);
+    placeChest(px, terrainH(px, pz), pz);
+    return;
+  }
   if (MATERIAL_HARDNESS[type] === undefined) return;
   const {
     touchedAny,
@@ -9730,7 +10141,12 @@ const MONSTER_SIZE = 1;
 const MONSTER_SPAWN_DIST = 100;
 const MONSTER_SPEED_CAP = 12;
 const MONSTER_ATTACK_RANGE = 1.3;
-const MONSTER_ATTACK_VERTICAL_RANGE = 2.0; 
+const SEEK_ANGLE_SPREAD = 0.9;
+const SEEK_ANGLE_FALLOFF_DIST = 6;
+const SEEK_ANGLE_MIN_FACTOR = 0.35;
+const FLEE_HP_FRACTION = 0.2;
+const FLEE_LEASH_DIST = 16;
+const MONSTER_ATTACK_VERTICAL_RANGE = 2.0;
 const MONSTER_HIT_COOLDOWN = 1.0;
 const MONSTER_KNOCKBACK_DIST = 25;
 const MONSTER_KNOCKBACK_DURATION = 0.6;
@@ -9740,6 +10156,7 @@ const PLAYER_KNOCKBACK_SPEED = PLAYER_KNOCKBACK_DIST / PLAYER_KNOCKBACK_DURATION
 const MONSTER_WALL_PROBE_DIST = 0.9;
 const MONSTER_WALL_SLOPE_DEG = 70;
 const MONSTER_EAT_BASE_SECONDS = 1.6;
+const CHEST_EAT_SECONDS = MONSTER_EAT_BASE_SECONDS * 0.4;
 const MONSTER_WALL_CHECK_RADIUS = 32;
 const MONSTER_WALL_PROBE_INTERVAL = 0.2;
 const MONSTER_BAR_MAX_DIST = 140;
@@ -9756,6 +10173,14 @@ const BOSS_DROP_COUNT = 3,
 
 const BOSS_DMG_PCT_DIVISOR = 2,
   SUPERBOSS_DMG_PCT_DIVISOR = 4;
+const BOSS_KNOCKBACK_DIVISOR = 2,
+  SUPERBOSS_KNOCKBACK_DIVISOR = 8;
+const KNOCKBACK_PCT_TO_DIST = 10;
+function monsterKnockbackDist(m, baseDist) {
+  if (m.isSuperboss) return baseDist / SUPERBOSS_KNOCKBACK_DIVISOR;
+  if (m.isBoss) return baseDist / BOSS_KNOCKBACK_DIVISOR;
+  return baseDist;
+}
 const MONSTER_DROP_CHANCE = 0.5;
 function mGroundY(x, z, refY) {
   const dxg = x - feetX,
@@ -9791,6 +10216,48 @@ const atkDmg = prof("atkDmg", function atkDmg() {
 const mSpeed = wave => 1 + 11 * (1 - Math.exp(-0.0005 * Math.pow(wave, 0.75)));
 const mHp = wave => 10 + 5 * Math.pow(wave, 1.35) * (1 + 0.05 * Math.log1p(wave));
 const mDmg = wave => 10 + 0.4 * Math.pow(wave, 1.15);
+const MONSTER_WAVE_JITTER = 5;
+function waveJitter(wave) {
+  return Math.max(0, wave + (Math.random() * (MONSTER_WAVE_JITTER * 2) - MONSTER_WAVE_JITTER));
+}
+const MONSTER_TYPE_CHANCE = {
+  elite: 0.03,
+  tanky: 0.10,
+  stealthy: 0.10
+};
+const MONSTER_TYPE_CONFIG = {
+  normal: {
+    sizeMult: 1,
+    speedMult: 1,
+    statMult: 1,
+    label: 'NORMAL'
+  },
+  tanky: {
+    sizeMult: 1.25,
+    speedMult: 0.75,
+    statMult: 2,
+    label: 'TANKY'
+  },
+  stealthy: {
+    sizeMult: 0.75,
+    speedMult: 1.5,
+    statMult: 0.5,
+    label: 'STEALTHY'
+  },
+  elite: {
+    sizeMult: 1,
+    speedMult: 1.25,
+    statMult: 2,
+    label: 'ELITE'
+  }
+};
+function rollMonsterType() {
+  const r = Math.random();
+  if (r < MONSTER_TYPE_CHANCE.elite) return 'elite';
+  if (r < MONSTER_TYPE_CHANCE.elite + MONSTER_TYPE_CHANCE.tanky) return 'tanky';
+  if (r < MONSTER_TYPE_CHANCE.elite + MONSTER_TYPE_CHANCE.tanky + MONSTER_TYPE_CHANCE.stealthy) return 'stealthy';
+  return 'normal';
+}
 const monsterCountBase = wave => Math.sqrt(Math.sqrt(Math.pow(wave, 1.5)));
 function mCount(wave) {
   wave = Math.max(1, wave);
@@ -9811,12 +10278,12 @@ function mLight(wave) {
     L_BRIGHT = 0.95;
   if (r <= 10000) return THREE.MathUtils.lerp(L_BASE, L_DARK, smooth01(r / 10000));else if (r <= 20000) return THREE.MathUtils.lerp(L_DARK, L_BASE, smooth01((r - 10000) / 10000));else return THREE.MathUtils.lerp(L_BASE, L_BRIGHT, smooth01((r - 20000) / 10000));
 }
+const _scratchMonsterColor = new THREE.Color();
 function mColor(wave) {
   const hue = (wave % 1000 + 1000) % 1000 / 1000;
   const light = mLight(wave);
-  const c = new THREE.Color();
-  c.setHSL(hue, MONSTER_ATTACK_SATURATION, light);
-  return c;
+  _scratchMonsterColor.setHSL(hue, MONSTER_ATTACK_SATURATION, light);
+  return _scratchMonsterColor;
 }
 const PART_BUCKET_NAMES = ['Red Scale', 'Orange Hide', 'Yellow Carapace', 'Lime Stinger', 'Moss Shard', 'Plasma Membrane', 'Cyan Crystal', 'Blue Shell', 'Indigo Mane', 'Purple Tusk', 'Magenta Barb', 'Pink Plate'];
 const PART_BUCKET_RANGES = [[1, 83], [84, 166], [167, 250], [251, 333], [334, 416], [417, 500], [501, 583], [584, 666], [667, 750], [751, 833], [834, 916], [917, 1000]];
@@ -9863,9 +10330,8 @@ function randPart() {
   };
 }
 function bucketColor(bIdx, variant) {
-  const c = new THREE.Color();
-  c.setHSL(bIdx / 12, MONSTER_ATTACK_SATURATION, PART_VARIANT_LIGHT[variant]);
-  return c;
+  _scratchMonsterColor.setHSL(bIdx / 12, MONSTER_ATTACK_SATURATION, PART_VARIANT_LIGHT[variant]);
+  return _scratchMonsterColor;
 }
 function drop(m) {
   if (devMode) return;
@@ -9937,20 +10403,55 @@ let monsters = [];
 let nextMonsterId = 1;
 const monsterLayerEl = document.getElementById('monsterLayer');
 const monsterBarEls = new Map();
+
+const monsterBarPool = [];
+function acquireMonsterBarEls() {
+  const pooled = monsterBarPool.pop();
+  if (pooled) return pooled;
+  const root = document.createElement('div');
+  root.className = 'monsterBar';
+  const fill = document.createElement('div');
+  fill.className = 'monsterBarFill';
+  root.appendChild(fill);
+  const text = document.createElement('div');
+  text.className = 'monsterBarText';
+  monsterLayerEl.appendChild(root);
+  monsterLayerEl.appendChild(text);
+  return {
+    root,
+    fill,
+    text
+  };
+}
+function releaseMonsterBarEls(els) {
+  els.root.style.display = 'none';
+  els.text.style.display = 'none';
+  monsterBarPool.push(els);
+}
 function spawn(wave, strengthMult = 1, opts = null) {
   wave = Math.max(0, wave);
-  const sizeMult = opts && opts.sizeMult || 1;
+  const bossSizeMult = opts && opts.sizeMult || 1;
   const isBoss = !!(opts && opts.isBoss);
   const isSuperboss = !!(opts && opts.isSuperboss);
-  const statMult = isSuperboss ? SUPERBOSS_STAT_MULT : isBoss ? BOSS_STAT_MULT : 1;
-  const speed = mSpeed(wave);
+  const bossStatMult = isSuperboss ? SUPERBOSS_STAT_MULT : isBoss ? BOSS_STAT_MULT : 1;
+
+  const monsterType = rollMonsterType();
+  const typeCfg = MONSTER_TYPE_CONFIG[monsterType];
+
+  const cheaterMult = isCheater ? CHEATER_STAT_MULT : 1;
+  const sizeMult = bossSizeMult * typeCfg.sizeMult;
+  const statMult = bossStatMult * typeCfg.statMult * cheaterMult;
+
+  const statsWave = waveJitter(wave);
+  const colorWave = waveJitter(wave);
+  const speed = mSpeed(statsWave) * currentWaveSpeedMult * typeCfg.speedMult * cheaterMult;
   const spawnDist = mSpawnDist(speed);
   const angle = Math.random() * Math.PI * 2;
   const sx = feetX + Math.sin(angle) * spawnDist;
   const sz = feetZ + Math.cos(angle) * spawnDist;
   const groundY = mGroundY(sx, sz, feetY);
   const sy = (groundY !== null ? groundY : feetY) + MONSTER_SIZE * sizeMult / 2;
-  const maxHp = mHp(wave) * strengthMult * statMult;
+  const maxHp = mHp(statsWave) * strengthMult * statMult;
   const id = nextMonsterId++;
   let partBucket = null,
     partVariant = null,
@@ -9961,7 +10462,7 @@ function spawn(wave, strengthMult = 1, opts = null) {
     partVariant = rolled.variant;
     spawnColor = bucketColor(partBucket, partVariant);
   } else {
-    spawnColor = mColor(wave);
+    spawnColor = mColor(colorWave);
   }
   const m = {
     id,
@@ -9972,12 +10473,13 @@ function spawn(wave, strengthMult = 1, opts = null) {
     hp: maxHp,
     maxHp,
     speed,
-    damage: mDmg(wave) * strengthMult * statMult,
+    damage: mDmg(statsWave) * strengthMult * statMult,
     state: 'seek',
     hitCooldown: 0,
     eatElapsed: 0,
     eatDuration: 0,
     eatPoint: null,
+    eatChestId: null,
     eatColKey: null,
     kbFromX: 0,
     kbFromY: 0,
@@ -9987,30 +10489,24 @@ function spawn(wave, strengthMult = 1, opts = null) {
     kbToZ: 0,
     kbT: 0,
     wallProbeT: Math.random() * MONSTER_WALL_PROBE_INTERVAL,
+    seekAngleBias: (Math.random() * 2 - 1) * SEEK_ANGLE_SPREAD,
     lastBarPct: -1,
     lastBarText: '',
     partBucket,
     partVariant,
     sizeMult,
+    monsterType,
     isBoss,
     isSuperboss
   };
   monsters.push(m);
-  const root = document.createElement('div');
-  root.className = 'monsterBar';
-  root.style.display = 'none';
-  const fill = document.createElement('div');
-  fill.className = 'monsterBarFill';
-  root.appendChild(fill);
-  const text = document.createElement('div');
-  text.className = 'monsterBarText';
-  text.style.display = 'none';
-  monsterLayerEl.appendChild(root);
-  monsterLayerEl.appendChild(text);
+  const barEls = acquireMonsterBarEls();
+  barEls.root.style.display = 'none';
+  barEls.text.style.display = 'none';
   monsterBarEls.set(id, {
-    root,
-    fill,
-    text,
+    root: barEls.root,
+    fill: barEls.fill,
+    text: barEls.text,
     visible: false,
     lastPos: null
   });
@@ -10030,8 +10526,7 @@ function despawn(m) {
   if (idx !== -1) monsters.splice(idx, 1);
   const els = monsterBarEls.get(m.id);
   if (els) {
-    els.root.remove();
-    els.text.remove();
+    releaseMonsterBarEls(els);
     monsterBarEls.delete(m.id);
   }
   renderWorker.postMessage({
@@ -10044,6 +10539,7 @@ const _monsterWallDir = new THREE.Vector3();
 const _monsterWallOrigin = new THREE.Vector3();
 const _monsterWallRaycaster = new THREE.Raycaster();
 const MONSTER_WALL_COS = Math.cos(THREE.MathUtils.degToRad(90 - MONSTER_WALL_SLOPE_DEG));
+
 function mWallAhead(m, dirX, dirY, dirZ, probeDist = MONSTER_WALL_PROBE_DIST) {
   const targets = rayTargets();
   if (!targets.length) return null;
@@ -10062,13 +10558,23 @@ function mWallAhead(m, dirX, dirY, dirZ, probeDist = MONSTER_WALL_PROBE_DIST) {
   }
   return null;
 }
+
 function mobAI(m, dt) {
   m.hitCooldown = Math.max(0, m.hitCooldown - dt);
   if (m.state === 'knockback') {
+    const prevE = easeOut(m.kbT);
     m.kbT = Math.min(1, m.kbT + dt / MONSTER_KNOCKBACK_DURATION);
     const e = easeOut(m.kbT);
-    m.x = THREE.MathUtils.lerp(m.kbFromX, m.kbToX, e);
-    m.z = THREE.MathUtils.lerp(m.kbFromZ, m.kbToZ, e);
+    const kbStepX = (m.kbToX - m.kbFromX) * (e - prevE);
+    const kbStepZ = (m.kbToZ - m.kbFromZ) * (e - prevE);
+    const sdx = feetX - m.x,
+      sdz = feetZ - m.z;
+    const sdist = Math.sqrt(sdx * sdx + sdz * sdz);
+    const sInv = sdist > 0.0001 ? 1 / sdist : 0;
+    const seekStepX = sdx * sInv * m.speed * dt;
+    const seekStepZ = sdz * sInv * m.speed * dt;
+    m.x += kbStepX + seekStepX;
+    m.z += kbStepZ + seekStepZ;
     const groundY = mGroundY(m.x, m.z, m.y - MONSTER_SIZE * m.sizeMult / 2);
     m.y = (groundY !== null ? groundY : m.y - MONSTER_SIZE * m.sizeMult / 2) + MONSTER_SIZE * m.sizeMult / 2;
     if (m.kbT >= 1) m.state = 'seek';
@@ -10081,7 +10587,9 @@ function mobAI(m, dt) {
   if (m.state === 'eating') {
     m.eatElapsed += dt;
     if (m.eatElapsed >= m.eatDuration) {
-      if (m.eatPoint) {
+      if (m.eatChestId !== null && m.eatChestId !== undefined) {
+        destroyChest(m.eatChestId);
+      } else if (m.eatPoint) {
         carveSphere(m.eatPoint.x, m.eatPoint.y, m.eatPoint.z);
         invalidateAt(m.eatPoint.x, m.eatPoint.z, MINE_RADIUS + DENS_STEP * 2);
       }
@@ -10089,9 +10597,22 @@ function mobAI(m, dt) {
       m.eatElapsed = 0;
       m.eatDuration = 0;
       m.eatPoint = null;
+      m.eatChestId = null;
       m.eatColKey = null;
       _groundTargetsDirty = true;
     }
+    return;
+  }
+  if (m.hp > 0 && m.hp <= m.maxHp * FLEE_HP_FRACTION && dist < FLEE_LEASH_DIST) {
+    const invLen = dist > 0.0001 ? 1 / dist : 0;
+    const fleeX = -dx * invLen,
+      fleeZ = -dz * invLen;
+    const step = m.speed * dt;
+    m.x += fleeX * step;
+    m.z += fleeZ * step;
+    const half = MONSTER_SIZE * m.sizeMult / 2;
+    const groundY = mGroundY(m.x, m.z, m.y - half);
+    m.y = (groundY !== null ? groundY : m.y - half) + half;
     return;
   }
   if (dist <= MONSTER_ATTACK_RANGE && Math.abs(dyAttack) <= MONSTER_ATTACK_VERTICAL_RANGE) {
@@ -10104,16 +10625,24 @@ function mobAI(m, dt) {
       m.state = 'knockback';
       m.kbFromX = m.x;
       m.kbFromZ = m.z;
-      m.kbToX = m.x + bx * MONSTER_KNOCKBACK_DIST;
-      m.kbToZ = m.z + bz * MONSTER_KNOCKBACK_DIST;
+      const kbDist = monsterKnockbackDist(m, MONSTER_KNOCKBACK_DIST);
+      m.kbToX = m.x + bx * kbDist;
+      m.kbToZ = m.z + bz * kbDist;
       m.kbT = 0;
       knockback(dx, dz, dist);
     }
     return;
   }
   const invLen = dist > 0.0001 ? 1 / dist : 0;
-  const dirX = dx * invLen,
+  let dirX = dx * invLen,
     dirZ = dz * invLen;
+  if (dist > 0.0001) {
+    const biasFactor = SEEK_ANGLE_MIN_FACTOR + (1 - SEEK_ANGLE_MIN_FACTOR) * Math.min(1, dist / SEEK_ANGLE_FALLOFF_DIST);
+    const baseAngle = Math.atan2(dirZ, dirX);
+    const biasedAngle = baseAngle + m.seekAngleBias * biasFactor;
+    dirX = Math.cos(biasedAngle);
+    dirZ = Math.sin(biasedAngle);
+  }
   const step = m.speed * dt;
   m.wallProbeT -= dt;
   if (dist <= MONSTER_WALL_CHECK_RADIUS && m.wallProbeT <= 0) {
@@ -10122,10 +10651,17 @@ function mobAI(m, dt) {
     const wallHit = mWallAhead(m, dirX, 0, dirZ, probeDist);
     if (wallHit) {
       m.state = 'eating';
-      m.eatPoint = wallHit.point.clone();
       m.eatElapsed = 0;
-      const hardness = terrainHard(wallHit.point.x, wallHit.point.y, wallHit.point.z);
-      m.eatDuration = MONSTER_EAT_BASE_SECONDS / Math.max(0.0001, 1 - hardness / 100);
+      if (wallHit.object.userData && wallHit.object.userData.isChest) {
+        m.eatChestId = wallHit.object.userData.chestId;
+        m.eatPoint = null;
+        m.eatDuration = CHEST_EAT_SECONDS;
+      } else {
+        m.eatChestId = null;
+        m.eatPoint = wallHit.point.clone();
+        const hardness = terrainHard(wallHit.point.x, wallHit.point.y, wallHit.point.z);
+        m.eatDuration = MONSTER_EAT_BASE_SECONDS / Math.max(0.0001, 1 - hardness / 100);
+      }
       return;
     }
   }
@@ -10152,10 +10688,15 @@ let waveActive = false;
 let waveSpawnQueue = 0;
 let waveSpawnTimer = 0;
 let currentWaveStrengthMult = 1;
-const WAVE_SKIP_OPTIONS = [1, 2, 4, 8, 16];
+let currentWaveSpeedMult = 1;
+const WAVE_SKIP_OPTIONS = [1, 2, 4, 8, 16, 32, 64];
 let waveSkipMultIndex = 0;
 let waveSkipMult = WAVE_SKIP_OPTIONS[waveSkipMultIndex];
-const waveMult = skip => 1 + (skip - 1) * 0.5;
+const WAVE_SKIP_SPEED_MULT = {
+  32: 1.5,
+  64: 2
+};
+const waveMult = skip => skip === 32 ? 31.5 : skip === 64 ? 63.5 : 1 + (skip - 1) * 0.5;
 const waveBtnEl = document.getElementById('waveBtn');
 const waveLabelEl = document.getElementById('waveLabel');
 const waveSkipBtnEl = document.getElementById('waveSkipBtn');
@@ -10181,10 +10722,56 @@ function cycleSkip() {
   uiSkip();
 }
 let pendingBossSpawns = [];
+
+const CHEAT_RELOAD_WINDOW_MS = 2 * 60 * 1000;
+const CHEAT_RELOAD_THRESHOLD = 3;
+const CHEATER_STAT_MULT = 10;
+let cheatReloadTimestamps = [];
+let isCheater = false;
+let cheatRevertWave = null;
+
+let waveStartPrevWave = 0;
+
+let __lastLoadHadActiveWave = false;
+function registerCheatReload() {
+  const now = Date.now();
+  cheatReloadTimestamps.push(now);
+  cheatReloadTimestamps = cheatReloadTimestamps.filter(t => now - t <= CHEAT_RELOAD_WINDOW_MS);
+  if (!isCheater && cheatReloadTimestamps.length >= CHEAT_RELOAD_THRESHOLD) {
+    flagCheater();
+  }
+  save();
+}
+function flagCheater() {
+  if (isCheater) return;
+  isCheater = true;
+  cheatRevertWave = currentWave;
+  cheatReloadTimestamps = [];
+}
+
+const CHEAT_CPS_WINDOW_MS = 1000;
+const CHEAT_CPS_THRESHOLD = 40;
+let clickTimestamps = [];
+function registerClickForCps() {
+  if (isCheater) return;
+  const now = Date.now();
+  clickTimestamps.push(now);
+  const cutoff = now - CHEAT_CPS_WINDOW_MS;
+  while (clickTimestamps.length && clickTimestamps[0] < cutoff) clickTimestamps.shift();
+  if (clickTimestamps.length > CHEAT_CPS_THRESHOLD) {
+    flagCheater();
+    save();
+  }
+}
+function despawnAllMonsters() {
+  for (const m of monsters.slice()) despawn(m);
+}
 function nextWave() {
   if (waveActive) return;
   currentWaveStrengthMult = waveMult(waveSkipMult);
+  currentWaveSpeedMult = WAVE_SKIP_SPEED_MULT[waveSkipMult] || 1;
   const prevWave = currentWave;
+  waveStartPrevWave = prevWave;
   currentWave += waveSkipMult;
   waveActive = true;
   waveSpawnQueue = mCount(currentWave);
@@ -10203,6 +10790,8 @@ function nextWave() {
   for (let i = 0; i < bossOnlyCount; i++) pendingBossSpawns.push({
     isBoss: true
   });
+
+  if (typeof save === 'function') save();
 }
 waveBtnEl.addEventListener('click', nextWave);
 waveSkipBtnEl.addEventListener('click', cycleSkip);
@@ -10235,6 +10824,8 @@ function waveDone() {
       type: 'setNight',
       on: false
     });
+
+    if (typeof save === 'function') save();
   }
 }
 function syncXform() {
@@ -10372,7 +10963,9 @@ function syncHpBars() {
       m.lastBarPct = pct;
       els.fill.style.width = pct * 100 + '%';
     }
-    const barPrefix = m.isSuperboss ? 'SUPERBOSS ' : m.isBoss ? 'BOSS ' : '';
+    const bossLabel = m.isSuperboss ? 'SUPERBOSS' : m.isBoss ? 'BOSS' : '';
+    const typeLabel = (MONSTER_TYPE_CONFIG[m.monsterType] || MONSTER_TYPE_CONFIG.normal).label;
+    const barPrefix = (bossLabel ? bossLabel + ' ' : '') + typeLabel + ' ';
     const barText = `${barPrefix}${Math.ceil(Math.max(0, m.hp))}/${Math.ceil(m.maxHp)}`;
     if (m.lastBarText !== barText) {
       m.lastBarText = barText;
@@ -10382,9 +10975,9 @@ function syncHpBars() {
 }
 
 const AOE_HIT_FRACTIONS = [1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8, 1 / 9, 1 / 10];
-const AOE_RADIUS_STEP = 0.75; 
-const AOE_MAX_TARGETS = 6;    
-const AOE_FALLOFF = 0.6;      
+const AOE_RADIUS_STEP = 0.75;
+const AOE_MAX_TARGETS = 6;
+const AOE_FALLOFF = 0.15;
 function aoeRadiusForFraction(fraction) {
   let tier = 0;
   for (const cutoff of AOE_HIT_FRACTIONS) {
@@ -10443,6 +11036,7 @@ const _attackBox = new THREE.Box3();
 const _attackHit = new THREE.Vector3();
 
 const PLAYER_ATTACK_RANGE = MINE_RANGE;
+const ATTACK_HOLD_INTERVAL = 1 / 3;
 function atkCursor() {
   if (!monsters.length) return false;
   _attackDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -10484,13 +11078,16 @@ function atkCursor() {
         best.kbFromX = best.x;
         best.kbFromZ = best.z;
         best.kbT = 0;
-        best.kbToX = best.x + dx / dlen * MONSTER_KNOCKBACK_DIST * (1 + wep.stats.knockbackPct);
-        best.kbToZ = best.z + dz / dlen * MONSTER_KNOCKBACK_DIST * (1 + wep.stats.knockbackPct);
+        const kbDist = monsterKnockbackDist(best, wep.stats.knockbackPct * KNOCKBACK_PCT_TO_DIST);
+        best.kbToX = best.x + dx / dlen * kbDist;
+        best.kbToZ = best.z + dz / dlen * kbDist;
       }
     }
   } else {
     dmg = atkDmg();
   }
+
+  if (isCheater) dmg = 0;
   const top = equipped('armorTop');
   if (top && top.stats.atkBonusPct) {
     let bonusPct = top.stats.atkBonusPct;
@@ -10554,6 +11151,7 @@ let lastTime = performance.now();
 let fpsAccum = 0,
   fpsFrames = 0,
   fpsDisplay = 0,
+  mainFpsDisplay = 0,
   statsTimer = 0;
 const SAVE_KEY = LS_PREFIX + 'save';
 const SAVE_FORMAT_VERSION = 2;
@@ -10580,6 +11178,19 @@ const buildSave = () => ({
   bounds: Array.from(minedChunkBounds).flat(),
   hardness: placedHardness.size ? Array.from(placedHardness).flat() : null,
   biome: placedBiome.size ? Array.from(placedBiome).flat() : null,
+  chests: chests.map(c => ({
+    id: c.id,
+    x: c.x,
+    y: c.y,
+    z: c.z,
+    slots: c.slots
+  })),
+  nextChestId,
+  waveActive,
+  cheatReloadTimestamps,
+  isCheater,
+  cheatRevertWave,
+  waveStartPrevWave,
   savedAt: Date.now()
 });
 const save = prof("save", function save() {
@@ -10616,6 +11227,19 @@ const applySave = prof("applySave", function applySave(data) {
   }
   if (typeof data.currentWave === 'number') currentWave = Math.max(0, Math.floor(data.currentWave));
   if (typeof data.health === 'number' && isFinite(data.health)) health = data.health;
+  __lastLoadHadActiveWave = !!data.waveActive;
+  if (Array.isArray(data.cheatReloadTimestamps)) {
+    cheatReloadTimestamps = data.cheatReloadTimestamps.filter(t => typeof t === 'number' && isFinite(t));
+  }
+  if (typeof data.isCheater === 'boolean') isCheater = data.isCheater;
+  if (typeof data.cheatRevertWave === 'number' && isFinite(data.cheatRevertWave)) {
+    cheatRevertWave = data.cheatRevertWave;
+  } else if (data.cheatRevertWave === null) {
+    cheatRevertWave = null;
+  }
+  if (typeof data.waveStartPrevWave === 'number' && isFinite(data.waveStartPrevWave)) {
+    waveStartPrevWave = data.waveStartPrevWave;
+  }
   if (typeof data.selectedHotbarIndex === 'number') selectedHotbarIndex = data.selectedHotbarIndex;
   if (Array.isArray(data.edits) || Array.isArray(data.bounds)) {
     densityEdits.clear();
@@ -10644,6 +11268,44 @@ const applySave = prof("applySave", function applySave(data) {
       });
     }
     if (typeof rebuildAll === 'function') rebuildAll();
+  }
+  if (Array.isArray(data.chests)) {
+    for (const c of chests.slice()) destroyChest(c.id);
+    for (const saved of data.chests) {
+      if (!saved || typeof saved !== 'object') continue;
+      if (typeof saved.x !== 'number' || typeof saved.y !== 'number' || typeof saved.z !== 'number') continue;
+      const id = typeof saved.id === 'number' ? saved.id : nextChestId--;
+      const mesh = makeChestCollisionMesh(saved.x, saved.y, saved.z);
+      mesh.userData.chestId = id;
+      const slots = new Array(CHEST_SLOT_COUNT).fill(null);
+      if (Array.isArray(saved.slots)) {
+        for (let i = 0; i < CHEST_SLOT_COUNT; i++) {
+          const slot = saved.slots[i];
+          slots[i] = slot && typeof slot === 'object' && slot.type ? slot : null;
+        }
+      }
+      chests.push({
+        id,
+        x: saved.x,
+        y: saved.y,
+        z: saved.z,
+        slots,
+        mesh
+      });
+      renderWorker.postMessage({
+        type: 'spawnMonster',
+        id,
+        x: saved.x,
+        y: saved.y + CHEST_SIZE / 2,
+        z: saved.z,
+        color: CHEST_COLOR,
+        scale: CHEST_SIZE
+      });
+    }
+    _groundTargetsDirty = true;
+    if (typeof data.nextChestId === 'number' && isFinite(data.nextChestId)) {
+      nextChestId = Math.min(nextChestId, data.nextChestId);
+    }
   }
   camera.position.set(feetX, camEyeY(feetX, feetZ, feetY), feetZ);
   for (const slotName of EQUIP_SLOTS) rendSlot(slotName);
@@ -10714,11 +11376,18 @@ menuNewSaveBtn.addEventListener('click', () => {
   try {
     localStorage.removeItem(SAVE_KEY);
   } catch (e) {}
+
+  cheatReloadTimestamps = [];
+  isCheater = false;
+  cheatRevertWave = null;
+  waveStartPrevWave = 0;
   closeMenu();
 });
 menuContinueBtn.addEventListener('click', () => {
   if (!hasSave()) return;
   load();
+
+  if (__lastLoadHadActiveWave) registerCheatReload();
   closeMenu();
 });
 const onDeath = prof("onDeath", function onDeath() {
@@ -10726,6 +11395,11 @@ const onDeath = prof("onDeath", function onDeath() {
   if (typeof inventoryOpen !== 'undefined' && inventoryOpen) toggleInv();
   if (typeof optionsOpen !== 'undefined' && optionsOpen) toggleOpts(false);
   if (document.pointerLockElement === canvas) document.exitPointerLock();
+
+  const wasWaveActive = waveActive;
+  const restartWave = waveStartPrevWave;
+  const wasCheater = isCheater;
+  const revertWave = cheatRevertWave;
   if (hasSave()) {
     load();
   } else {
@@ -10736,6 +11410,25 @@ const onDeath = prof("onDeath", function onDeath() {
     camera.position.set(feetX, camEyeY(feetX, feetZ, feetY), feetZ);
     uiHealth();
   }
+
+  despawnAllMonsters();
+  waveActive = false;
+  waveSpawnQueue = 0;
+  waveSpawnTimer = 0;
+  pendingBossSpawns = [];
+  if (wasWaveActive) currentWave = restartWave;
+  if (wasCheater) {
+    isCheater = false;
+    if (typeof revertWave === 'number' && isFinite(revertWave)) currentWave = revertWave;
+    cheatRevertWave = null;
+    cheatReloadTimestamps = [];
+  }
+  uiWave();
+  renderWorker.postMessage({
+    type: 'setNight',
+    on: false
+  });
+  save();
   menuOpen = true;
   menuPlayRowEl.style.display = 'flex';
   menuChoiceRowEl.style.display = 'none';
@@ -10747,12 +11440,15 @@ const AUTOSAVE_INTERVAL_MS = 15000;
 setInterval(() => {
   if (!menuOpen) save();
 }, AUTOSAVE_INTERVAL_MS);
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && !menuOpen) save();
-});
-window.addEventListener('beforeunload', () => {
+
+function saveOnExit() {
   if (!menuOpen) save();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveOnExit();
 });
+window.addEventListener('pagehide', saveOnExit);
+window.addEventListener('beforeunload', saveOnExit);
 const exportSaveBtn = document.getElementById('exportSaveBtn');
 const importSaveBtn = document.getElementById('importSaveBtn');
 const saveDataBox = document.getElementById('saveDataBox');
@@ -10781,14 +11477,592 @@ importSaveBtn.addEventListener('click', () => {
   saveDataMsgEl.textContent = result.ok ? 'Save imported.' : result.error;
 });
 
+const MUSIC_TRACKS = {
+  nullzone: {
+    title: 'Nullzone Biome', author: 'WoolWL', sr: 44100,
+    code: `sr=44100,q0="4_D_3_B2_92_92_94_D3_B2_92_92_923_C_2_A1_81_81_83_C2_A1_81_81_81",q1="8_G_6_E4_D4_D4_D8_G6_E4_D4_D4_D47_F_5_D3_C3_C3_C7_F5_D3_C3_C3_C3",q2="9_I98_G9_E9_E9_E9_I8_G9_E9_E9_E98_H87_F8_D8_D8_D8_H7_F8_D8_D8_D8",q3="D_LDB_KD_ID_ID_ID_LB_KD_ID_ID_IDC_KCA_JC_HC_HC_HC_KA_JC_HC_HC_HC",b0="III_GG_EE_EE_GG_III_GG_EE_EE_GG_HHH_FF_DD_DD_FF_HHH_FF_DD_DD_FF_",p0="KHHHSHKHHHKHSHHHKHHHSHKHHSKHSHKH",f=(n,i)=>2**((parseInt(n[int(t/i)%n.length],36)+3)/12)/4*448,p=(n,i,v)=>(x=n[int(t/i)%n.length],x=="K"?kik(t%i,v):x=="H"?ha(t%i,v):x=="S"?sn(t%i,v):0),sa=(f,a)=>(x=t/sr*f%1*a,isNaN(x)?0:x),n=(t,v)=>floor(t/v)**10%255/255,kik=(t,v)=>(x=max(min((sin(sr/t/3)+1)/2*max(0,2-t/sr*32),1),0)*v,isNaN(x)?0:x),ha=(t,v)=>n(t,1)*max(0,1-t/sr*24)*v,sn=(t,v)=>round(n(t,sr/4096))*min(max(0,2-t/sr*24),1)*v,v=32,sa(f(q0,sr/8),v-t/sr*8*v%v)+sa(f(q1,sr/8),v-t/sr*8*v%v)+sa(f(q2,sr/8),v-t/sr*8*v%v)+sa(f(q3,sr/8),v-t/sr*8*v%v)+sa(f(b0,sr/8)/4,48)+p(p0,sr/8,80)`
+  },
+  tidalise: {
+    title: 'Tidalise', author: 'd3nschot', sr: 44100,
+    code: `Bpm=120,Hz=44100,tf=abs((((t/Hz/180*3)*256*128)*Bpm)),C=261.63/(T=4/2.972),Db=277.18/T,D=293.66/T,Eb=311.13/T,E=329.63/T,F=349.23/T,Gb=369.99/T,G=392.00/T,Ab=415.30/T,A=440.00/T,Bb=466.16/T,B=493.88/T,M=[E,E,A,A,C*2,D*2,F,F][N=tf/2>>16&7]/256,m1=([E,D,C,C,E,D,A/2,A/2][N])/256,mx=([4.75,5,5,5,4.75,5,4.75,4.75][N]),m2=(([G,Gb,D,D,D,D,G,Gb,D,D,D,D,G,Gb,C,C,C,C,C,C,C,C,C,C,G,Gb,D,D,D,D,G,Gb,D,D,D,D,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,G,Gb,A,A,A,A,G,Gb,B,B,B,B,G,Gb,C,C,C,C,C,C,C,C,C,C,G,Gb,D,D,D,D,G,Gb,D,D,D,D,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2,A/2][((tf*3/4)>>14)%96])*(('1111111011111110'[t>>14&15])*(b='10'[tf>>18&1])+([0,1][tf>>18&1]))+(([0,0,0,0,0,0,0,0,0,0,0,0,0,0,A,G,0,0,0,0,0,0,0,0,0,0,0,0,0,0,A,G][tf>>13&31])/2)*b+(tf>>18&1))*t/64&128,m=64,(+(t*M/2*('24002403'[tf/2>>13&7])/4%256)+(t*E/256*([1,1.5,2,(5+(1/3))/2,4,2,(5+(1/3))/2,2][tf/2>>12&7])%256)+int((t*(m1*([4,mx,6][(tf/2>>9)%3]))/128%4)**2/8)*128+(tf&2097152?m2%256:0))/3`
+  },
+  greenery: {
+    title: 'Greenery', author: 'feeshbread', sr: 44100,
+    code: `b=t*.27,bt=(x,l,s)=>(x>>s)%l,D=(s,vol)=>(b&(16384*s)-1)/vol,SW=(x,a)=>a*sin(x*PI/64)+a,fm=(x,m)=>SW(x+SW(x,m),255),S=(arr,s)=>t*.82*2**(arr[bt(b,arr.length,s)]/12),t?0:Z=[],X=0,lpf=(a,c)=>(Y=X++,Z[Y]??=0,Z[Y]+=(a-Z[Y])*c),hpf=(a,c)=>a-lpf(a,c),bpf=(a,hc,lc)=>hpf(lpf(a,lc),hc),lbf=(a,c,v)=>a+lpf(a,c)*v,hbf=(a,c,v)=>a+hpf(a,c)*v,(tanh(hpf(hbf(lbf(tanh((tanh(bpf(SW(170*cbrt(b%16384),64),.01,.1)/20*max(1-D(1,1.6e4)*2,0)**2)*45+45+tanh(fm(S([-24,-33,-28,-31],16),(1-D(.25,1.6e4))**4*35+10)*(1-D(.25,1.6e4))**4/100)*70*min(D(1,1.6e4)*3,1)+70-tanh(bpf(S([[7-12,10,12,15,22][A=bt(t,5,0)],[0,3,7,10,14][A],[3-12,7,10,12,15][A],[5-12,8,10,15,19][A]],16)/2%128,.01,.003)*D(1,1.6e4)/3)*64+64+hpf(tanh(+2/((b>>6)+127&255)*(sin((t*sin(t>>5)&250)/6)+1)*.2),.1)*70+tanh(tan(hpf((t*sin(t>>2)&52)*(1-D(.125,1.6e3*.68))**9,.9)+50))*6*(D(1,1.6e4)+D(.5,1.6e4/2)))/255-.1)*255,.001,11),.25,2),.001)/128*1.4)+1)*127`
+  },
+  glitchlands: {
+    title: 'Glitchlands', author: 'UltraDasher965', sr: 44100,
+
+    startT: 1000000,
+    code: `A=4096,D=2**19,F=255,G=256,H=512,J=A*2,B=t%A,a=tanh(atan(sin(6*cbrt(B))*5*(1-B/A))/2+(random()*(300/B))-(random()*(300/B)))*(0x84450441>>(31&t>>12)&1),C=[0,0,-4,5],S=(a,s)=>t*2**(a[t>>s&3]/12),I=t*[1,1,.8,1.5][3&t>>16],atan(tanh(a/(1-t%D/D)/250*(t<D)+a*(t>D)+(t*sin(t>>1)&F)*(1/(t%(J/'11222212'[7&t>>13])))-(t*sin(t/1.0001>>1)&F)*(1/(t%(J/'11222212'[7&t>>13])))+(1&t>>18)*(random()-.5+((t*2.25&F)/G)-((t*2&F)/G))/(1-t%D/D)/196+((((t*sin(t/1.75>>2)&F)-((t*sin(t/1.751>>2)&F))*(1-t%J/J))/H)*(1&-t>>13)*(1&t>>14))*(t>D*2)+((I*(t>>2^t>>13)&F)/H-.25)*(t>D*2)+((I*(t>>2&t>>13)&F)/H-.25)*(t>D*4)+(sin(A*'1213121412131278'[15&t>>13]/(t%A))*(0x75d7>>(t>>12&15)&1))*(1-t%A/A)/2*(t>D*4)+((acos(cos(S(C,16)*PI/H))/5+acos(cos(S(C,16)*PI/510))/5)-.5)*(t>D*6))*2)*90-128`
+  },
+  rocklands: {
+    title: 'Rocklands', author: 'GreaserPirate', sr: 44100,
+
+    startT: 500000,
+    code: `s=sin(t>>5),h=1&t,t*=.18,rpt=(beats,fill)=>Array(beats).fill(fill),beat=(arr,len,spd,vel=2e4,morph=t,oct=0)=>(vel/(morph&(2**(spd-oct)/(arr[(t>>spd)%len]))-1)),mix=(x,vol,dist=0)=>(x*vol*(1+dist))%(256*vol),m=(x,v,d)=>isNaN(mix(x,v,d))?0:mix(x,v,d),seq=(arr,len,spd)=>arr[(t>>spd)%len],mseq=(arr,len,spd,transp=0)=>t*1.05946**(transp+seq(arr,len,spd)),p=[4,9,4.5,7.5],q=[1,,,,,1,,1],q2=[1,h,s,h,h,2,s,h],mel=[0,0,7,8,7,0,3,5,7,5,3,5,2,3,2,5],mel2=[3,3,2,2,0,0,5,-2],bass=[8,5,0,10],lead1=m(mseq(mel,16,11)&beat([1],1,11,1e3),14,0),lead2=m(mseq(mel,16,11),1.7,3),lead3=m(mseq(mel,16,11,12),.9,3),lLeft=m(lead1+lead2,.35),lRight=m(lead1+lead3,.35),bs=m(mseq(bass,4,14),.5),drums=m(beat(q2,8,11,5e4),.6)+m(beat(q,8,11,4e5),.7),lead4=m(m(mseq(mel2,8,13,47.8),.5)+m(mseq(mel2,8,13,48.3),.2)+beat([1],1,10,1e5,t),.13),distBass=bs&beat([1],1,10,5e4,bs),dbPunchy=m(beat([1],1,12,1e6)+bs&beat([1],1,10,5e4,bs),.4),[m((lLeft|bs%64)+dbPunchy+lead4,.6)+m(drums*1.2,.44),m((lRight|bs%128)+dbPunchy+lead4,.6)+m(drums*1.2,.4)]`
+  },
+  beachy: {
+    title: 'Beachy', author: 'HypernovaHeathen', sr: 44100,
+    code: `d=t*1.125**'14231425'[t>>18&7],((d|1.005*d)&255)/16+((d/2|d/2*1.01)&255)/16+((1.5*d|1.501*d)&255)/16+((d/2*1.5|d/2*1.5005)&255)/16+(x=>[0,x,x,x,x,x,x,x][t>>20&7])((t*1.125**(((t>>13&3)+1)*((t>>15&1)+1))/32&24|t*1.125**(((t>>13&3)+1)*((t>>15&1)+1))/32*1.005&24)+(t*1.125**(((t>>13&3)+1)*((t>>15&1)+1))/16&24|t*1.125**(((t>>13&3)+1)*((t>>15&1)+1))/16*1.001&24))+(x=>[0,x,x,x][t>>21&3])(abs(1024*log(t&16383)%256-128)/2)+(random()*((-t>>9&15)+1)+random()*((-t>>11&15)+1)+(t*1.0625**'1423'[t>>17&3]*((t/1.375>>10&1)+1)/4&4)+(t*1.0625**'1423'[t>>17&3]*((t/1.25>>11&1)+1)/6&4)+(t*1.0625**'1423'[t>>17&3]*((t/1.375>>10&1)+1)/16&4)+(t*1.0625**'1423'[t>>17&3]*((t/1.25>>11&1)+1)/24&4)+(t*1.0625**'1423'[t>>17&3]*((t/1.375>>10&1)+1)/4*1.0001&4)+(t*1.0625**'1423'[t>>17&3]*((t/1.25>>11&1)+1)/6*1.0001&4)+(t*1.0625**'1423'[t>>17&3]*((t/1.375>>10&1)+1)/16*1.0005&4)+(t*1.0625**'1423'[t>>17&3]*((t/1.25>>11&1)+1)/24*1.0005&4))*(t>>22&1)`
+  },
+  combat: {
+    title: 'Combat', author: null, sr: 60000,
+    code: `T=t/7500,U=2*T,b=T/8%88,u=b<16,v=b<80,w='797479',G=(c,o)=>33E5*T*2**(o+parseInt(c,36)/12),R=x=>((x^-(x>>8&1))&240)*(i=32*T%32,j=32*T%1,i<1||i>=16&&i<17?j:i>31||i>15&&i<16?1-j:1),C=(a,T)=>a[T>>5&a.length-1][T&31],S=(n,f,o=1,d)=>(f=parseInt(C([[(y='5 5  5')+\`T \${y}T \${y}T 5\`+(u?'T  1T55':'SS4SSSS')],[y+\`5D5 5  1DD\${y}T 5SOCSSSS\`],[\`4\${x='SSSSSSS'}4\${x}4S\`+x+x],[(x='4CSSS0444CSSS444')+x],[(x='4C   0444C   444')+x]][f],T-d),36),n=C([['9 9  9997 7  7775 5  77 99'+(u?'  99AC':x='CEC9CE'),'9 9  999A A  AAAC A  AA 99'+(u?'  AA77':x)],[(x='4 4  444')+'0 2  2220 0  22 44'+(u?'  4457':w),x+y+\`557 5  55 44\`+(u?'  5522':w)],[\`C4\${w}E4\${w}C4\${w}24\`+w],[\`CC\${w}EE\${w}CC\${w}77\`+w],['77242024992420247724202422242024']][n],T-d),isNaN(f)||n==' '?0:(r=G(n,o-2)*(4*T&3||f/4&1?1:2**(-1/12))>>8,e=f>>3&3,d=f&3,128*(((e==1?r+64*sin(PI*U):e==2&&!(U&1)||e==3&&U&1?0:r)&255)>(!d?224:d==1?192:d==2?128:(8*T&3)<2?64:128)))),L=(n,f,o)=>S(n,f,o,0)+S(n,f,o,1.5)/2+S(n,f,o,3)/3,D=(i,p,s)=>(1E5*sin(i*T|0)&64)*(1-U%2/3)*(p>>(U>>s)&1),min(255,(b<32?L(0,0,0):b<48?L(0,1):b<56?L(2,2):L(3,v?3:4))/3+(b<32?L(1,0,0):b<48?L(1,1):b>64&&L(4,4,b<72||!v?1:2))/3+.6*R(G('9 9 9 9 9 9 9 997 7 7 7 7 7 7 775 5 5 5 5 5 5 5 4 4 4 445 5 5 55'[U&63],-3)/64)+(v&&D(290,b<15.5?0x31111111:0xE4444444,1)+(b<15.5?D(1E6,0xC4A4A4A4,1):D(1E6,0xD4445444,0))/3+(!u&&50*(sin(150*(T%4)**.4)+1)*(1-T/4%1))))`
+  }
+};
+
+const MUSIC_BIOME_TRACK = {};
+MUSIC_BIOME_TRACK[BIOME.NULLZONE] = 'nullzone';
+MUSIC_BIOME_TRACK[BIOME.TIDALISE] = 'tidalise';
+MUSIC_BIOME_TRACK[BIOME.GREENERY] = 'greenery';
+MUSIC_BIOME_TRACK[BIOME.GLITCHLANDS] = 'glitchlands';
+MUSIC_BIOME_TRACK[BIOME.ROCKLANDS] = 'rocklands';
+MUSIC_BIOME_TRACK[BIOME.BEACHY] = 'beachy';
+
+const MUSIC_WORKER_SRC = String.raw`
+"use strict";
+try {
+
+  try {
+    new Function('return 1')();
+    self.postMessage({ type: 'diag', check: 'new Function', ok: true });
+  } catch (evalErr) {
+    self.postMessage({ type: 'diag', check: 'new Function', ok: false, message: evalErr.message });
+  }
+const GLOBAL_FALLBACKS = {
+  int: Math.floor, isNaN: isNaN, isFinite: isFinite,
+  parseInt: parseInt, parseFloat: parseFloat,
+  Array: Array, Number: Number, String: String, Boolean: Boolean,
+  NaN: NaN, Infinity: Infinity
+};
+
+const SANDBOX_BASE = Object.create(null);
+for (const k of Object.getOwnPropertyNames(Math)) SANDBOX_BASE[k] = Math[k];
+Object.assign(SANDBOX_BASE, GLOBAL_FALLBACKS);
+const SANDBOX_NAMES = Object.keys(SANDBOX_BASE);
+
+const RESERVED = new Set(['true','false','null','undefined','this','typeof','void',
+  'delete','in','instanceof','new','function','return','if','else','for','while','do',
+  'switch','case','break','continue','try','catch','finally','throw','var','let','const',
+  'class','extends','super','import','export','default','yield','async','await','static',
+  'of','with','debugger','enum','implements','interface','package','private','protected',
+  'public']);
+const BUILTIN_NAMES = new Set(SANDBOX_NAMES);
+const BACKTICK = String.fromCharCode(96);
+const DOLLAR = String.fromCharCode(36);
+const LBRACE = String.fromCharCode(123);
+
+function tokenizeFormula(code) {
+  const tokens = [];
+  let i = 0;
+  const n = code.length;
+  const isIdStart = c => /[A-Za-z_$]/.test(c);
+  const isIdPart = c => /[A-Za-z0-9_$]/.test(c);
+  const isDigit = c => c >= '0' && c <= '9';
+
+  const stack = [];
+  while (i < n) {
+    const top = stack.length ? stack[stack.length - 1] : null;
+    if (top && top.kind === 'text') {
+      let j = i, s = '', ended = false, interpStart = false;
+      while (j < n) {
+        if (code[j] === '\\') { s += code[j] + (code[j + 1] || ''); j += 2; continue; }
+        if (code[j] === BACKTICK) { ended = true; break; }
+        if (code[j] === DOLLAR && code[j + 1] === LBRACE) { interpStart = true; break; }
+        s += code[j]; j++;
+      }
+      tokens.push({ type: 'text', value: s });
+      i = j;
+      if (ended) { stack.pop(); i++; }
+      else if (interpStart) { stack.push({ kind: 'expr', depth: 0 }); i += 2; }
+      continue;
+    }
+    const c = code[i];
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
+    if (c === "'" || c === '"') {
+      const quote = c; let j = i + 1, s = c;
+      while (j < n && code[j] !== quote) {
+        if (code[j] === '\\') { s += code[j] + (code[j + 1] || ''); j += 2; continue; }
+        s += code[j]; j++;
+      }
+      tokens.push({ type: 'string', value: s + quote });
+      i = j + 1;
+      continue;
+    }
+    if (c === BACKTICK) { stack.push({ kind: 'text' }); i++; continue; }
+    if (top && top.kind === 'expr') {
+      if (c === LBRACE) { top.depth++; }
+      else if (c === '}') {
+        if (top.depth === 0) { stack.pop(); i++; continue; }
+        top.depth--;
+      }
+    }
+    if (isDigit(c) || (c === '.' && isDigit(code[i + 1] || ''))) {
+      let j = i;
+      if (code[j] === '0' && (code[j + 1] === 'x' || code[j + 1] === 'X')) {
+        j += 2; while (j < n && /[0-9a-fA-F]/.test(code[j])) j++;
+      } else {
+        while (j < n && isDigit(code[j])) j++;
+        if (code[j] === '.') { j++; while (j < n && isDigit(code[j])) j++; }
+        if (code[j] === 'e' || code[j] === 'E') {
+          let k = j + 1;
+          if (code[k] === '+' || code[k] === '-') k++;
+          if (isDigit(code[k])) { j = k; while (j < n && isDigit(code[j])) j++; }
+        }
+      }
+      tokens.push({ type: 'number', value: code.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (isIdStart(c)) {
+      let j = i + 1;
+      while (j < n && isIdPart(code[j])) j++;
+      tokens.push({ type: 'ident', value: code.slice(i, j) });
+      i = j;
+      continue;
+    }
+    tokens.push({ type: 'punc', value: c });
+    i++;
+  }
+  return tokens;
+}
+
+function classifyIdentifiers(code) {
+  const tokens = tokenizeFormula(code);
+  const builtins = new Set();
+  const scratch = new Set();
+  for (let k = 0; k < tokens.length; k++) {
+    const t = tokens[k];
+    if (t.type !== 'ident') continue;
+    if (RESERVED.has(t.value)) continue;
+    const prev = tokens[k - 1];
+    if (prev && prev.type === 'punc' && prev.value === '.') continue;
+    if (BUILTIN_NAMES.has(t.value)) builtins.add(t.value);
+    else scratch.add(t.value);
+  }
+  return { builtins, scratch };
+}
+
+function compileTrack(code) {
+  const { builtins, scratch } = classifyIdentifiers(code);
+  scratch.delete('t');
+  let src = '"use strict";\n';
+  if (builtins.size) {
+    const decls = [];
+    for (const nm of builtins) decls.push(nm + '=__sb.' + nm);
+    src += 'let ' + decls.join(',') + ';\n';
+  }
+  if (scratch.size) src += 'let ' + [...scratch].join(',') + ';\n';
+  src += 'return function(t){ return (\n' + code + '\n); };';
+  const factory = new Function('__sb', src);
+  return factory(SANDBOX_BASE);
+}
+
+let outSampleRate = 0;
+const voices = [];
+let dataPort = null;
+
+let currentVolume = 1;
+
+function makeVoice(id, code, sr, startT = 0) {
+  let fn;
+  try {
+    fn = compileTrack(code);
+  } catch (e) {
+    fn = () => 0;
+  }
+  return { id, fn, sr, cursor: startT, gain: 0, gainTarget: 0, gainStep: 0, fadeLeft: 0, lastL: 0, lastR: 0 };
+}
+
+function applySwitch(msg) {
+  const fadeSamples = Math.max(1, Math.round((msg.fadeSeconds || 1.6) * outSampleRate));
+  for (const v of voices) {
+    v.gainTarget = 0;
+    v.fadeLeft = fadeSamples;
+    v.gainStep = (v.gainTarget - v.gain) / fadeSamples;
+  }
+  const nv = makeVoice(msg.id, msg.code, msg.sr, msg.startT || 0);
+  nv.gainTarget = 1;
+  nv.fadeLeft = fadeSamples;
+  nv.gainStep = (nv.gainTarget - nv.gain) / fadeSamples;
+  voices.push(nv);
+}
+
+let qualityDivisor = 1;
+const MAX_QUALITY_DIVISOR = 8;
+let goodTicksInARow = 0;
+const RECOVERY_TICKS = 60;
+let sampleClock = 0;
+
+function renderSample() {
+  const evaluate = (sampleClock % qualityDivisor) === 0;
+  sampleClock++;
+  let l = 0, r = 0;
+  for (let vi = voices.length - 1; vi >= 0; vi--) {
+    const v = voices[vi];
+    if (v.fadeLeft > 0) {
+      v.gain += v.gainStep;
+      v.fadeLeft--;
+      if (v.fadeLeft <= 0) v.gain = v.gainTarget;
+    }
+    if (v.gain <= 0.0008 && v.gainTarget === 0) {
+      voices.splice(vi, 1);
+      continue;
+    }
+    const t = Math.floor(v.cursor);
+    v.cursor += v.sr / outSampleRate;
+    if (evaluate) {
+      let raw;
+      try { raw = v.fn(t); } catch (e) { raw = 0; }
+      if (Array.isArray(raw)) {
+        v.lastL = Math.floor(raw[0]) & 255;
+        v.lastR = Math.floor(raw[1]) & 255;
+      } else {
+        const b = Math.floor(raw) & 255;
+        v.lastL = b; v.lastR = b;
+      }
+    }
+    l += (v.lastL / 127.5 - 1) * v.gain;
+    r += (v.lastR / 127.5 - 1) * v.gain;
+  }
+  return [l, r];
+}
+
+const TICK_INTERVAL_MS = 30;
+const TICK_BUDGET_MS = 20;
+const MAX_BACKFILL_MS = 250;
+let lastTickTime = 0;
+
+function tick() {
+  try {
+    const now = performance.now();
+    const elapsedMs = lastTickTime ? (now - lastTickTime) : TICK_INTERVAL_MS;
+    lastTickTime = now;
+
+    if (currentVolume <= 0.001) return;
+    if (voices.length > 0) {
+      const attemptMs = Math.min(elapsedMs, MAX_BACKFILL_MS);
+      const samplesToAttempt = Math.max(0, Math.round(attemptMs / 1000 * outSampleRate));
+      if (samplesToAttempt > 0) {
+        const deadline = now + TICK_BUDGET_MS;
+        const buf = new Float32Array(samplesToAttempt * 2);
+        let produced = 0;
+        for (let i = 0; i < samplesToAttempt; i++) {
+          if (i > 0 && (i & 63) === 0 && performance.now() > deadline) break;
+          const s = renderSample();
+          buf[produced * 2] = s[0];
+          buf[produced * 2 + 1] = s[1];
+          produced++;
+        }
+        if (produced < samplesToAttempt) {
+
+          qualityDivisor = Math.min(MAX_QUALITY_DIVISOR, qualityDivisor * 2 || 2);
+          goodTicksInARow = 0;
+        } else if (qualityDivisor > 1) {
+          goodTicksInARow++;
+          if (goodTicksInARow >= RECOVERY_TICKS) {
+            qualityDivisor = Math.max(1, qualityDivisor >> 1);
+            goodTicksInARow = 0;
+          }
+        }
+        if (produced > 0 && dataPort) {
+          const out = produced === samplesToAttempt ? buf : buf.slice(0, produced * 2);
+          dataPort.postMessage({ type: 'chunk', samples: out }, [out.buffer]);
+        }
+      }
+    }
+  } catch (err) {
+    try {
+      self.postMessage({
+        type: 'workerError',
+        source: 'tick',
+        message: (err && err.message) || String(err),
+        stack: (err && err.stack) || null
+      });
+    } catch (postErr) {  }
+  } finally {
+    setTimeout(tick, TICK_INTERVAL_MS);
+  }
+}
+
+function handleMessage(msg) {
+  try {
+    if (msg.type === 'init') {
+      outSampleRate = msg.sampleRate;
+      lastTickTime = 0;
+      tick();
+    } else if (msg.type === 'switch') {
+      if (!outSampleRate) return;
+      applySwitch(msg);
+    } else if (msg.type === 'bindPort') {
+      dataPort = msg.port;
+    } else if (msg.type === 'volume') {
+      currentVolume = msg.value;
+    }
+  } catch (err) {
+    try {
+      self.postMessage({
+        type: 'workerError',
+        source: 'handleMessage:' + (msg && msg.type),
+        message: (err && err.message) || String(err),
+        stack: (err && err.stack) || null
+      });
+    } catch (postErr) {  }
+  }
+}
+self.onmessage = e => handleMessage(e.data);
+} catch (initErr) {
+  try {
+    self.postMessage({
+      type: 'workerError',
+      source: 'top-level-init',
+      message: (initErr && initErr.message) || String(initErr),
+      stack: (initErr && initErr.stack) || null
+    });
+  } catch (postErr) {  }
+}
+
+`;
+const MUSIC_WORKER_URL = URL.createObjectURL(new Blob([MUSIC_WORKER_SRC], {
+  type: 'text/javascript'
+}));
+let musicWorker = new Worker(MUSIC_WORKER_URL);
+musicWorker.onerror = e => {
+  dbg(`musicWorker THREW: ${e.message} @ line ${e.lineno}:${e.colno}`, true);
+  e.preventDefault();
+};
+musicWorker.onmessage = e => {
+  const msg = e.data;
+  if (msg && msg.type === 'workerError') {
+    dbg(`musicWorker caught error in ${msg.source}: ${msg.message}${msg.stack ? '\n' + msg.stack : ''}`, true);
+  } else if (msg && msg.type === 'diag') {
+    dbg(`musicWorker diag [${msg.check}]: ${msg.ok ? 'OK' : 'BLOCKED - ' + msg.message}`, !msg.ok);
+  }
+};
+dbg('musicWorker constructed');
+
+const BYTEBEAT_WORKLET_SRC = `
+class BytebeatProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.queue = [];
+    this.queueFrames = 0;
+    this.readOffset = 0;
+    this.masterVolume = 0.6;
+    this.masterVolumeTarget = 0.6;
+    this.dataPort = null;
+
+    this.port.onmessage = (e) => this.handleControlMessage(e.data);
+  }
+  handleControlMessage(msg) {
+    if (msg.type === 'bindPort') {
+      this.dataPort = msg.port;
+      this.dataPort.onmessage = (e) => this.handleChunkMessage(e.data);
+    } else if (msg.type === 'volume') {
+      this.masterVolumeTarget = msg.value;
+    }
+  }
+  handleChunkMessage(msg) {
+    if (msg.type === 'chunk') {
+      const samples = msg.samples;
+      this.queue.push(samples);
+      this.queueFrames += samples.length / 2;
+      const maxFrames = sampleRate * 0.5;
+      while (this.queueFrames > maxFrames && this.queue.length > 1) {
+        const dropped = this.queue.shift();
+        this.queueFrames -= (dropped.length / 2 - this.readOffset);
+        this.readOffset = 0;
+      }
+    }
+  }
+  process(inputs, outputs) {
+    const output = outputs[0];
+    const chL = output[0];
+    const chR = output.length > 1 ? output[1] : output[0];
+    const n = chL.length;
+    for (let i = 0; i < n; i++) {
+      this.masterVolume += (this.masterVolumeTarget - this.masterVolume) * 0.002;
+      let l = 0, r = 0;
+      if (this.queue.length > 0) {
+        const chunk = this.queue[0];
+        const idx = this.readOffset * 2;
+        l = chunk[idx];
+        r = chunk[idx + 1];
+        this.readOffset++;
+        this.queueFrames--;
+        if (this.readOffset * 2 >= chunk.length) {
+          this.queue.shift();
+          this.readOffset = 0;
+        }
+      }
+
+      chL[i] = l * this.masterVolume;
+      chR[i] = r * this.masterVolume;
+    }
+    return true;
+  }
+}
+registerProcessor('bytebeat-processor', BytebeatProcessor);
+`;
+
+let audioCtx = null;
+let bytebeatNode = null;
+let audioReady = false;
+let audioInitInFlight = false;
+let currentMusicKey = null;
+let musicVolume = Math.max(0, Math.min(100, Number(lsGet('musicVolume', 60)))) / 100;
+let __musicVoiceSeq = 0;
+
+function ssGet(key, fallback) {
+  try {
+    const v = sessionStorage.getItem('horizon.' + key);
+    return v === null ? fallback : v;
+  } catch (e) {
+    return fallback;
+  }
+}
+function ssSet(key, value) {
+  try {
+    sessionStorage.setItem('horizon.' + key, String(value));
+  } catch (e) {}
+}
+function musicShownThisSession(key) {
+  try {
+    const raw = ssGet('musicShown', '');
+    return raw.split(',').includes(key);
+  } catch (e) {
+    return false;
+  }
+}
+function markMusicShown(key) {
+  try {
+    const raw = ssGet('musicShown', '');
+    const list = raw ? raw.split(',') : [];
+    if (!list.includes(key)) {
+      list.push(key);
+      ssSet('musicShown', list.join(','));
+    }
+  } catch (e) {}
+}
+
+const musicPopupEl = document.getElementById('musicPopup');
+const musicPopupTitleEl = document.getElementById('musicPopupTitle');
+const musicPopupAuthorEl = document.getElementById('musicPopupAuthor');
+let __musicPopupHideTimer = null;
+function showMusicPopup(track) {
+  if (!musicPopupEl) return;
+  musicPopupTitleEl.textContent = track.title;
+  musicPopupAuthorEl.textContent = track.author ? ('by ' + track.author) : '';
+  musicPopupAuthorEl.style.display = track.author ? 'block' : 'none';
+  musicPopupEl.classList.add('show');
+  if (__musicPopupHideTimer) clearTimeout(__musicPopupHideTimer);
+  __musicPopupHideTimer = setTimeout(() => {
+    musicPopupEl.classList.remove('show');
+    __musicPopupHideTimer = null;
+  }, 5500);
+}
+
+async function initAudio() {
+  if (audioReady || audioInitInFlight) return;
+  audioInitInFlight = true;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const workletUrl = 'data:application/javascript;charset=utf-8,' +
+      encodeURIComponent(BYTEBEAT_WORKLET_SRC);
+    await audioCtx.audioWorklet.addModule(workletUrl);
+    bytebeatNode = new AudioWorkletNode(audioCtx, 'bytebeat-processor', {
+      numberOfInputs: 0,
+      numberOfOutputs: 1,
+      outputChannelCount: [2]
+    });
+    bytebeatNode.connect(audioCtx.destination);
+    bytebeatNode.port.postMessage({ type: 'volume', value: musicVolume });
+
+    const musicChannel = new MessageChannel();
+    bytebeatNode.port.postMessage({ type: 'bindPort', port: musicChannel.port2 }, [musicChannel.port2]);
+    musicWorker.postMessage({ type: 'bindPort', port: musicChannel.port1 }, [musicChannel.port1]);
+    musicWorker.postMessage({ type: 'init', sampleRate: audioCtx.sampleRate });
+    musicWorker.postMessage({ type: 'volume', value: musicVolume });
+    audioReady = true;
+    if (currentMusicKey) playMusic(currentMusicKey);
+  } catch (e) {
+    audioReady = false;
+  } finally {
+    audioInitInFlight = false;
+  }
+}
+function resumeAudio() {
+  if (!audioCtx) {
+    initAudio();
+    return;
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+}
+window.addEventListener('pointerdown', resumeAudio, { passive: true });
+window.addEventListener('keydown', resumeAudio);
+
+function playMusic(key) {
+  currentMusicKey = key;
+  const track = MUSIC_TRACKS[key];
+  if (!track) return;
+
+  if (!bytebeatNode) return;
+  musicWorker.postMessage({
+    type: 'switch',
+    id: ++__musicVoiceSeq,
+    code: track.code,
+    sr: track.sr,
+    startT: track.startT || 0,
+    fadeSeconds: 1.6
+  });
+  if (!musicShownThisSession(key)) {
+    markMusicShown(key);
+    showMusicPopup(track);
+  }
+}
+function setMusicVolume(v) {
+  musicVolume = Math.max(0, Math.min(100, Number(v) || 0)) / 100;
+  if (bytebeatNode) bytebeatNode.port.postMessage({ type: 'volume', value: musicVolume });
+  musicWorker.postMessage({ type: 'volume', value: musicVolume });
+  lsSet('musicVolume', Math.round(musicVolume * 100));
+}
+const musicVolSlider = document.getElementById('musicVolSlider');
+const musicVolVal = document.getElementById('musicVolVal');
+if (musicVolSlider) {
+  const initVol = Math.round(musicVolume * 100);
+  musicVolSlider.value = initVol;
+  if (musicVolVal) musicVolVal.textContent = initVol;
+  musicVolSlider.addEventListener('input', () => {
+    setMusicVolume(musicVolSlider.value);
+    if (musicVolVal) musicVolVal.textContent = Math.round(musicVolume * 100);
+  });
+}
+
+function desiredMusicKey() {
+  if (typeof monsters !== 'undefined' && monsters.length > 0) return 'combat';
+  const biome = biomeEff(feetX, feetZ);
+  return MUSIC_BIOME_TRACK[biome] || 'nullzone';
+}
+function tickMusic() {
+  const key = desiredMusicKey();
+  if (key !== currentMusicKey) playMusic(key);
+}
+
 const INSTALL_BUDGET_MS_MIN = 3;
 const INSTALL_BUDGET_MS_MAX = 20;
 const animate = prof("animate", function animate(now) {
   requestAnimationFrame(animate);
+
+  if (renderWorker) renderWorker.postMessage({
+    type: 'tick',
+    now
+  });
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
   const installBudgetMs = Math.min(INSTALL_BUDGET_MS_MAX, Math.max(INSTALL_BUDGET_MS_MIN, dt * 1000 * 0.5));
   _groundTargetsDirty = true;
+  tickMusic();
   if (cutsceneActive) {
     tickCutscene(dt);
     return;
@@ -10826,6 +12100,7 @@ const animate = prof("animate", function animate(now) {
   drainInstalls(performance.now() + installBudgetMs);
   if (!inventoryOpen && !devConsoleOpen && !optionsOpen) {
     tickMove(dt);
+    tickAttackHold(dt);
     tickMining(dt);
     tickPlacing(dt);
     tickDrain(dt);
@@ -10851,10 +12126,12 @@ const animate = prof("animate", function animate(now) {
   statsTimer += dt;
   if (statsTimer > 0.4) {
     fpsDisplay = lastWorkerFps;
+
+    mainFpsDisplay = Math.round(fpsFrames / Math.max(fpsAccum, 1e-6));
     fpsAccum = 0;
     fpsFrames = 0;
     statsTimer = 0;
-    statsEl.textContent = `FPS: ${fpsDisplay} | Chunks: ${chunkEntries.size} | Tris: ${Math.round(runningTriCount)}`;
+    statsEl.textContent = `FPS: ${fpsDisplay} (main ${mainFpsDisplay}) | Chunks: ${chunkEntries.size} | Tris: ${Math.round(runningTriCount)}`;
     rendPlayerStats();
   }
   if (perfLogIntervalSec > 0) {
