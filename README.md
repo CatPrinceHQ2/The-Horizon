@@ -8,7 +8,7 @@
 
 - The game is first person. You explore the triangular world and see all the biomes, swim in the water, then come back to your base for the main part of the game below.
 - Endless monster survival. Think of it like Zombs.io - you upgrade, you fight, you skip, build out strategies that work to fight the monsters, and make it to the next tiers. Main game progression actually stops at 30,000 waves, but NG+ has a special item relevant for 340,000.
-- When you explore, you can mine all the terrain and stuff and use those items to come back and make new gear to fight of the bad guys. They're all cubes, by the way.
+- When you explore, you can mine all the terrain and stuff and use those items to come back and make new gear to fight off the bad guys. They're all cubes, by the way.
 - The entire game has hundreds of items, with multiple builds per main tier of progression, strategy, inventory management, all of it.
 
 ## World & Biomes
