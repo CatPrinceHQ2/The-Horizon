@@ -2,7 +2,7 @@
 
 **A browser-based, infinite-wave 3D survival/mining/crafting game built with Three.js.**
 
-> **The Idea** Hi. I'm CatPrinceHQ. I do random crap in my free time ('shih', as i like to call it) and this is one of my.. 'shih's. It's a pretty big game. I think it'll take an average person like 10 hours to beat the thing. I'm really proud with how it all came out. This took me a very long time to create and i ran into massive roadblocks along the way which were time consuming to solve. I have over 200 development versions of the game. That's ALOT- it took me a very, very long time to create this. I hope you, (the player) enjoy this game.
+> Hi. I'm CatPrinceHQ. I do random crap in my free time ('shih', as i like to call it) and this is one of my.. 'shih's. It's a pretty big game. I think it'll take an average person like 10 hours to beat the thing. I'm really proud with how it all came out. This took me a very long time to create and i ran into massive roadblocks along the way which were time consuming to solve. I have over 200 development versions of the game. That's ALOT- it took me a very, very long time to create this. I hope you, (the player) enjoy this game.
 
 ## Core Gameplay Loop
 
