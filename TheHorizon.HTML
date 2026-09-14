@@ -348,6 +348,20 @@
   .menuBtn:hover{ border-color:#ffcf6b; color:#ffcf6b; }
   .menuBtn:disabled{ opacity:0.35; cursor:not-allowed; }
   .menuBtn:disabled:hover{ border-color:#ffffff; color:#fff; }
+  .menuSocialLabel{
+    font-family:-apple-system,"Segoe UI",Arial,sans-serif;
+    color:#fff; font-size:14px; letter-spacing:0.5px; opacity:0.85;
+    text-shadow:0 2px 12px rgba(0,0,0,0.6);
+  }
+  .menuSocialRow{ display:grid; grid-template-columns:1fr 1fr; gap:14px; justify-items:stretch; }
+  .menuSocialBtn{
+    background:rgba(0,0,0,0.55); color:#fff; border:2px solid #ffffff;
+    border-radius:10px; padding:10px 22px; font-size:14px; letter-spacing:0.5px;
+    font-family:-apple-system,"Segoe UI",Arial,sans-serif; cursor:pointer;
+    text-decoration:none; display:inline-flex; align-items:center; justify-content:center;
+    gap:8px; text-align:center;
+  }
+  .menuSocialBtn:hover{ border-color:#ffcf6b; color:#ffcf6b; }
   body.menu-active #crosshair, body.menu-active #coords, body.menu-active #waveCounter, body.menu-active #eventHorizonVignette, body.menu-active #miningBar,
   body.menu-active #healthBarLabel, body.menu-active #healthBar, body.menu-active #healthBarText,
   body.menu-active #monsterLayer, body.menu-active #heldItemCanvas, body.menu-active #waveLabel,
@@ -512,13 +526,35 @@
   }
   .hitFx{
     position:absolute; left:0; top:0;
-    border-radius:50%; border:2px solid #ffffff;
+    border-radius:50%; border:4px solid #ffffff;
+    box-shadow:0 0 10px 2px rgba(255,255,255,.85), inset 0 0 6px rgba(255,255,255,.55);
     pointer-events:none; box-sizing:border-box;
-    transition: transform 0.22s ease-out, opacity 0.22s ease-out;
+    transition: transform 0.24s ease-out, opacity 0.24s ease-out;
     will-change: transform, opacity;
   }
-  .hitFx.aoe{ border-color:#ff8a3d; border-width:3px; }
-  .hitFx.smash{ border-color:#b34dff; border-width:4px; }
+  .hitFx.aoe{ border-color:#ff8a3d; border-width:5px; box-shadow:0 0 14px 3px rgba(255,138,61,.9), inset 0 0 8px rgba(255,138,61,.6); }
+  .hitFx.smash{ border-color:#b34dff; border-width:6px; box-shadow:0 0 16px 4px rgba(179,77,255,.9), inset 0 0 8px rgba(179,77,255,.6); }
+  .hitFx.slice{
+    border:none; border-radius:3px; box-sizing:border-box;
+    background:linear-gradient(100deg, transparent 0%, rgba(255,255,255,.05) 32%, rgba(255,255,255,.95) 48%, rgba(255,255,255,.95) 52%, rgba(255,255,255,.05) 68%, transparent 100%);
+    box-shadow:0 0 8px 1px rgba(255,255,255,.5);
+  }
+  .dmgNum{
+    position:absolute; left:0; top:0; z-index:9;
+    font:800 26px/1 system-ui, -apple-system, sans-serif;
+    color:#fff; text-shadow:0 0 6px rgba(0,0,0,.9), 0 0 14px rgba(255,255,255,.4);
+    pointer-events:none; white-space:nowrap; display:none;
+    will-change: transform, opacity;
+  }
+  .dmgNum.crit{ color:#ffd23d; text-shadow:0 0 8px rgba(255,140,0,.95), 0 0 18px rgba(255,210,61,.55); }
+  .statusAura{
+    position:absolute; left:0; top:0;
+    width:74px; height:74px; margin:-37px 0 0 -37px;
+    border-radius:10px; border:3px solid transparent;
+    box-sizing:border-box; pointer-events:none; opacity:0; display:none;
+    transition: opacity .18s ease-out;
+  }
+  .statusAura.molecular{ border-radius:50%; border-style:dashed; }
   .monsterBarFill{ height:100%; width:100%; background:#ff5a5a; transition:width 0.12s linear; }
   .monsterBarText{
     position:absolute; left:0; top:0;
@@ -614,6 +650,13 @@
 <body class="menu-active">
 <div id="guiRoot">
 <div id="menuOverlay">
+  <div class="menuSocialLabel" id="menuSocialLabel">By CatPrinceHQ</div>
+  <div class="menuSocialRow" id="menuSocialRow">
+    <a class="menuSocialBtn" href="https://www.youtube.com/@CatPrinceHQ" target="_blank" rel="noopener noreferrer">YouTube</a>
+    <a class="menuSocialBtn" href="https://discord.gg/catprincehq" target="_blank" rel="noopener noreferrer">Discord</a>
+    <a class="menuSocialBtn" href="https://github.com/CatPrinceHQ2" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a class="menuSocialBtn" href="https://www.tiktok.com/@catprince.hq" target="_blank" rel="noopener noreferrer">TikTok</a>
+  </div>
   <div id="menuTitle">THE HORIZON</div>
   <div class="menuBtnRow" id="menuPlayRow">
     <button class="menuBtn" id="menuPlayBtn">Play</button>
@@ -2181,6 +2224,44 @@ function releaseMonsterMaterial(mat) {
 const HUE_SHIFT_SATURATION = 0.85;
 const hueShiftMeshes = new Map();
 const _hueShiftColor = new THREE.Color();
+// Per-monster status-effect color highlight, applied as a real tint on the
+// monster's own mesh (instead of a screen-space overlay) so it reads
+// correctly at any camera angle and multiple simultaneous effects can be
+// blended together on the main thread before being sent here.
+const monsterBaseColor = new Map();
+const monsterTintedIds = new Set();
+const _tintBaseColor = new THREE.Color();
+const _tintMixColor = new THREE.Color();
+function onMonsterTint(msg) {
+  const mesh = monsterMeshes.get(msg.id);
+  if (!mesh || mesh.userData.hueShift) return;
+  const baseHex = monsterBaseColor.get(msg.id);
+  if (baseHex == null) return;
+  if (msg.color == null) {
+    if (monsterTintedIds.has(msg.id)) {
+      monsterTintedIds.delete(msg.id);
+      mesh.material.dispose();
+      mesh.material = getMonsterMaterial(baseHex);
+    }
+    return;
+  }
+  _tintBaseColor.setHex(baseHex);
+  _tintMixColor.setHex(msg.color);
+  _tintBaseColor.lerp(_tintMixColor, 0.5);
+  if (!monsterTintedIds.has(msg.id)) {
+    releaseMonsterMaterial(mesh.material);
+    const mat = new THREE.MeshBasicMaterial({
+      color: _tintBaseColor,
+      fog: true,
+      depthFunc: THREE.GreaterDepth
+    });
+    addWireOverlay(mat, false);
+    mesh.material = mat;
+    monsterTintedIds.add(msg.id);
+  } else {
+    mesh.material.color.copy(_tintBaseColor);
+  }
+}
 function onSpawn(msg) {
   let mat;
   if (msg.hueShift) {
@@ -2203,6 +2284,7 @@ function onSpawn(msg) {
   mesh.userData.hueShift = !!msg.hueShift;
   scene.add(mesh);
   monsterMeshes.set(msg.id, mesh);
+  monsterBaseColor.set(msg.id, msg.color);
 }
 function onDespawn(msg) {
   const mesh = monsterMeshes.get(msg.id);
@@ -2211,9 +2293,13 @@ function onDespawn(msg) {
   if (mesh.userData.hueShift) {
     mesh.material.dispose();
     hueShiftMeshes.delete(msg.id);
+  } else if (monsterTintedIds.has(msg.id)) {
+    mesh.material.dispose();
+    monsterTintedIds.delete(msg.id);
   } else {
     releaseMonsterMaterial(mesh.material);
   }
+  monsterBaseColor.delete(msg.id);
   monsterMeshes.delete(msg.id);
 }
 function onMonsterScale(msg) {
@@ -2510,6 +2596,9 @@ function onMsg(msg) {
       break;
     case 'monsterScale':
       onMonsterScale(msg);
+      break;
+    case 'monsterTint':
+      onMonsterTint(msg);
       break;
     case 'monsterTransforms':
       onMonsterXform(msg);
@@ -9893,6 +9982,7 @@ function tickSolarStasis(dt) {
     let pct = item.stats.solarStasisAuraPct;
     if (m.isUltraboss) pct /= ULTRABOSS_DMG_PCT_DIVISOR; else if (m.isSuperboss) pct /= SUPERBOSS_DMG_PCT_DIVISOR; else if (m.isBoss) pct /= BOSS_DMG_PCT_DIVISOR;
     m.hp -= m.maxHp * pct * dt;
+    setMonsterStatusFx(m, "radiant", "#ffd23d", .3);
   }
 }
 
@@ -9916,6 +10006,7 @@ function tickMolecularDisruption(dt) {
     const dx = feetX - m.x, dy = playerCenterY - m.y, dz = feetZ - m.z;
     const dist = Math.hypot(dx, dy, dz);
     if (dist > pullRadius) continue;
+    setMonsterStatusFx(m, "molecular", "rgba(210,240,255,0.9)", .35, "molecular");
     if (dist > MOLECULAR_DISRUPTION_CONTACT_RADIUS) {
       const invLen = 1 / dist;
       const dirX = dx * invLen, dirY = dy * invLen, dirZ = dz * invLen;
@@ -10105,6 +10196,7 @@ function radiantLightAdjust(m, dist, dxToPlayer, dzToPlayer, dt) {
   const range = gem.stats.radiantRange;
   if (!(range > 0) || !(dist < range)) return 1;
   const closeness = 1 - dist / range;
+  setMonsterStatusFx(m, "radiant", "#ffd23d", .3);
   const slowMin = gem.stats.radiantSlowMin !== undefined ? gem.stats.radiantSlowMin : 1;
   const slowMult = 1 - closeness * (1 - slowMin);
   if (gem.stats.radiantPush && gem.stats.radiantPushSpeed && dist > 1e-4) {
@@ -12500,6 +12592,8 @@ const monsterBarPool = [];
 function acquireMonsterBarEls() {
   const pooled = monsterBarPool.pop();
   if (pooled) return pooled;
+  const aura = document.createElement("div");
+  aura.className = "statusAura";
   const root = document.createElement("div");
   root.className = "monsterBar";
   const fill = document.createElement("div");
@@ -12507,19 +12601,56 @@ function acquireMonsterBarEls() {
   root.appendChild(fill);
   const text = document.createElement("div");
   text.className = "monsterBarText";
+  monsterLayerEl.appendChild(aura);
   monsterLayerEl.appendChild(root);
   monsterLayerEl.appendChild(text);
   return {
     root: root,
     fill: fill,
-    text: text
+    text: text,
+    aura: aura
   };
 }
 
 function releaseMonsterBarEls(els) {
   els.root.style.display = "none";
   els.text.style.display = "none";
+  if (els.aura) {
+    els.aura.style.display = "none";
+    els.aura.style.opacity = "0";
+  }
   monsterBarPool.push(els);
+}
+
+// Parses a "#rgb"/"#rrggbb" or "rgb(a)(...)" status-effect color string into a
+// 0xRRGGBB integer so it can be blended onto a monster's mesh. Returns null if
+// the string can't be parsed.
+function parseFxColorHex(str) {
+  if (typeof str !== "string") return null;
+  if (str[0] === "#") {
+    const hex = str.length === 4 ? str[1] + str[1] + str[2] + str[2] + str[3] + str[3] : str.slice(1);
+    const v = parseInt(hex, 16);
+    return Number.isNaN(v) ? null : v;
+  }
+  const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (!m) return null;
+  return (parseInt(m[1], 10) << 16) | (parseInt(m[2], 10) << 8) | parseInt(m[3], 10);
+}
+
+// Generic per-monster status effect: color/duration/optional shape-variant,
+// tracked alongside the monster's HP bar. Plain (non-variant) effects — fire,
+// hemorrhage, radiant, etc. — get applied as an actual color tint on the
+// monster's own mesh (see syncHpBars/monsterTint below), blended together
+// when several are active at once instead of only the newest one showing.
+// Shape-variant effects (e.g. "molecular") keep a dedicated screen-space ring
+// since they represent a distinct effect shape, not just a color.
+function setMonsterStatusFx(m, key, color, duration, variant) {
+  if (!m._statusFx) m._statusFx = {};
+  m._statusFx[key] = {
+    color: color,
+    until: nowSec() + duration,
+    variant: variant || null
+  };
 }
 
 function spawn(wave, strengthMult = 1, opts = null) {
@@ -12622,12 +12753,17 @@ function spawn(wave, strengthMult = 1, opts = null) {
   const barEls = acquireMonsterBarEls();
   barEls.root.style.display = "none";
   barEls.text.style.display = "none";
+  barEls.aura.style.display = "none";
+  barEls.aura.style.opacity = "0";
   monsterBarEls.set(id, {
     root: barEls.root,
     fill: barEls.fill,
     text: barEls.text,
+    aura: barEls.aura,
     visible: false,
-    lastPos: null
+    lastPos: null,
+    lastAuraColor: null,
+    lastAuraVariant: null
   });
   renderWorker.postMessage({
     type: "spawnMonster",
@@ -13435,6 +13571,7 @@ function syncHpBars() {
   camera.updateMatrixWorld();
   const w = window.innerWidth, h = window.innerHeight;
   const aspect = w / h;
+  const __statusNowT = nowSec();
   if (mainPaniniActive) {
     const e = camera.matrixWorld.elements;
     _hpBarRight.set(e[0], e[1], e[2]);
@@ -13449,6 +13586,7 @@ function syncHpBars() {
       if (els.visible) {
         els.root.style.display = "none";
         els.text.style.display = "none";
+        if (els.aura) { els.aura.style.display = "none"; els.aura.style.opacity = "0"; }
         els.visible = false;
       }
       continue;
@@ -13462,6 +13600,7 @@ function syncHpBars() {
         if (els.visible) {
           els.root.style.display = "none";
           els.text.style.display = "none";
+          if (els.aura) { els.aura.style.display = "none"; els.aura.style.opacity = "0"; }
           els.visible = false;
         }
         continue;
@@ -13474,6 +13613,7 @@ function syncHpBars() {
         if (els.visible) {
           els.root.style.display = "none";
           els.text.style.display = "none";
+          if (els.aura) { els.aura.style.display = "none"; els.aura.style.opacity = "0"; }
           els.visible = false;
         }
         continue;
@@ -13487,6 +13627,7 @@ function syncHpBars() {
       if (els.visible) {
         els.root.style.display = "none";
         els.text.style.display = "none";
+        if (els.aura) { els.aura.style.display = "none"; els.aura.style.opacity = "0"; }
         els.visible = false;
       }
       continue;
@@ -13503,6 +13644,61 @@ function syncHpBars() {
       const t = `translate(${rsx}px, ${rsy}px)`;
       els.root.style.transform = t;
       els.text.style.transform = t;
+      if (els.aura) els.aura.style.transform = t;
+    }
+    if (m._statusFx) {
+      // Single pass: prune expired effects, track the best shape-variant
+      // effect (still shown as a screen-space ring, e.g. "molecular"), and
+      // accumulate every plain color effect (fire, hemorrhage, radiant, ...)
+      // to blend into one tint applied directly to the monster's mesh.
+      let bestVariant = null, bestVariantColor = null, bestVariantUntil = -Infinity, anyVariant = false;
+      let tintR = 0, tintG = 0, tintB = 0, tintN = 0;
+      for (const k in m._statusFx) {
+        const fx = m._statusFx[k];
+        if (fx.until <= __statusNowT) {
+          delete m._statusFx[k];
+          continue;
+        }
+        if (fx.variant) {
+          anyVariant = true;
+          if (fx.until > bestVariantUntil) {
+            bestVariantUntil = fx.until;
+            bestVariant = fx.variant;
+            bestVariantColor = fx.color;
+          }
+        } else {
+          const hex = parseFxColorHex(fx.color);
+          if (hex != null) {
+            tintR += (hex >> 16) & 255;
+            tintG += (hex >> 8) & 255;
+            tintB += hex & 255;
+            tintN++;
+          }
+        }
+      }
+      if (els.aura) {
+        if (anyVariant) {
+          if (els.aura.style.display !== "block") els.aura.style.display = "block";
+          els.aura.style.opacity = "0.9";
+          if (els.lastAuraColor !== bestVariantColor || els.lastAuraVariant !== bestVariant) {
+            els.lastAuraColor = bestVariantColor;
+            els.lastAuraVariant = bestVariant;
+            els.aura.className = "statusAura " + bestVariant;
+            els.aura.style.borderColor = bestVariantColor;
+            els.aura.style.boxShadow = `0 0 14px 3px ${bestVariantColor}`;
+          }
+        } else if (els.aura.style.display !== "none") {
+          els.aura.style.display = "none";
+          els.aura.style.opacity = "0";
+          els.lastAuraColor = null;
+          els.lastAuraVariant = null;
+        }
+      }
+      const tintHex = tintN > 0 ? (Math.round(tintR / tintN) << 16) | (Math.round(tintG / tintN) << 8) | Math.round(tintB / tintN) : null;
+      if (m._lastTintHex !== tintHex) {
+        m._lastTintHex = tintHex;
+        renderWorker.postMessage({ type: "monsterTint", id: m.id, color: tintHex });
+      }
     }
     const pct = Math.max(0, Math.min(1, m.hp / m.maxHp));
     if (m.lastBarPct !== pct) {
@@ -13561,8 +13757,9 @@ for (let __hfi = 0; __hfi < HIT_FX_POOL_SIZE; __hfi++) {
   });
 }
 
-function spawnHitFx(x, y, z, radius, variant) {
-  variant = variant || (radius > 0 ? "aoe" : "single");
+// Shared world->screen projection used by hit fx, slice fx, and damage numbers.
+// Returns {sx, sy} in pixel coordinates, or null if the point isn't projectable.
+function projectWorldToScreen(x, y, z) {
   const w = window.innerWidth, h = window.innerHeight;
   let ndcX, ndcY;
   if (mainPaniniActive) {
@@ -13574,19 +13771,28 @@ function spawnHitFx(x, y, z, radius, variant) {
     _hpBarRel.set(x, y, z).sub(camera.position);
     const localX = _hpBarRel.dot(_hpBarRight), localY = _hpBarRel.dot(_hpBarUp), localZ = _hpBarRel.dot(_hpBarFwd);
     const ndc = paniniProjectNdc(localX, localY, localZ, fov, w / h, mainPaniniD);
-    if (!ndc) return;
+    if (!ndc) return null;
     ndcX = ndc.x;
     ndcY = ndc.y;
   } else {
     _hitFxVec.set(x, y, z).project(camera);
-    if (_hitFxVec.z > 1) return;
+    if (_hitFxVec.z > 1) return null;
     ndcX = _hitFxVec.x;
     ndcY = _hitFxVec.y;
   }
+  return {
+    sx: (ndcX * .5 + .5) * w,
+    sy: (1 - (ndcY * .5 + .5)) * h
+  };
+}
+
+function spawnHitFx(x, y, z, radius, variant) {
+  variant = variant || (radius > 0 ? "aoe" : "single");
+  const proj = projectWorldToScreen(x, y, z);
+  if (!proj) return;
+  const sx = proj.sx, sy = proj.sy;
   const slot = _hitFxPool.find(s => !s.busy) || _hitFxPool[0];
-  const sx = (ndcX * .5 + .5) * w;
-  const sy = (1 - (ndcY * .5 + .5)) * h;
-  const pxRadius = variant === "single" ? 10 : Math.min(220, 24 + radius * 14);
+  const pxRadius = variant === "single" ? 16 : Math.min(220, 24 + radius * 14);
   slot.busy = true;
   clearTimeout(slot.timer);
   slot.el.className = "hitFx" + (variant !== "single" ? " " + variant : "");
@@ -13597,7 +13803,7 @@ function spawnHitFx(x, y, z, radius, variant) {
   slot.el.style.display = "block";
   slot.el.style.transition = "none";
   slot.el.style.transform = `translate(${sx}px, ${sy}px) scale(0.2)`;
-  slot.el.style.opacity = "0.9";
+  slot.el.style.opacity = "1";
   void slot.el.offsetWidth;
   slot.el.style.transition = "";
   slot.el.style.transform = `translate(${sx}px, ${sy}px) scale(1)`;
@@ -13605,7 +13811,90 @@ function spawnHitFx(x, y, z, radius, variant) {
   slot.timer = setTimeout(() => {
     slot.el.style.display = "none";
     slot.busy = false;
-  }, 240);
+  }, 260);
+}
+
+const SLICE_FX_POOL_SIZE = 10;
+const _sliceFxPool = [];
+for (let __sfi = 0; __sfi < SLICE_FX_POOL_SIZE; __sfi++) {
+  const el = document.createElement("div");
+  el.className = "hitFx slice";
+  el.style.display = "none";
+  el.style.width = "150px";
+  el.style.height = "10px";
+  el.style.marginLeft = "-75px";
+  el.style.marginTop = "-5px";
+  monsterLayerEl.appendChild(el);
+  _sliceFxPool.push({ el: el, busy: false, timer: null });
+}
+
+// A quick directional "slash" streak on top of the hit ring, for extra readability on-hit.
+function spawnSliceFx(x, y, z) {
+  const proj = projectWorldToScreen(x, y, z);
+  if (!proj) return;
+  const sx = proj.sx, sy = proj.sy;
+  const slot = _sliceFxPool.find(s => !s.busy) || _sliceFxPool[0];
+  const angle = Math.round(Math.random() * 50 - 25);
+  slot.busy = true;
+  clearTimeout(slot.timer);
+  slot.el.style.display = "block";
+  slot.el.style.transition = "none";
+  slot.el.style.transform = `translate(${sx}px, ${sy}px) rotate(${angle}deg) scaleX(0.15)`;
+  slot.el.style.opacity = "1";
+  void slot.el.offsetWidth;
+  slot.el.style.transition = "transform 0.16s ease-out, opacity 0.2s ease-in";
+  slot.el.style.transform = `translate(${sx}px, ${sy}px) rotate(${angle}deg) scaleX(1)`;
+  slot.el.style.opacity = "0";
+  slot.timer = setTimeout(() => {
+    slot.el.style.display = "none";
+    slot.busy = false;
+  }, 220);
+}
+
+const DMG_NUM_POOL_SIZE = 24;
+const _dmgNumPool = [];
+for (let __dni = 0; __dni < DMG_NUM_POOL_SIZE; __dni++) {
+  const el = document.createElement("div");
+  el.className = "dmgNum";
+  el.style.display = "none";
+  monsterLayerEl.appendChild(el);
+  _dmgNumPool.push({ el: el, busy: false, timer: null });
+}
+
+const DMG_NUM_BASE_FADE = .2;
+const DMG_NUM_MIN_FADE = .05;
+
+// Floating damage number near screen center. Fade duration scales down with
+// attack speed so rapid-fire weapons don't leave a wall of overlapping numbers.
+function spawnDamageNumber(amount, isCrit) {
+  if (!(amount > 0)) return;
+  const interval = typeof currentAttackInterval === "function" ? currentAttackInterval() : ATTACK_HOLD_INTERVAL;
+  const fade = Math.max(DMG_NUM_MIN_FADE, Math.min(DMG_NUM_BASE_FADE, DMG_NUM_BASE_FADE * (interval / ATTACK_HOLD_INTERVAL)));
+  const slot = _dmgNumPool.find(s => !s.busy) || _dmgNumPool[0];
+  const w = window.innerWidth, h = window.innerHeight;
+  const spreadX = Math.min(260, w * .16);
+  const spreadY = Math.min(140, h * .12);
+  const cx = w / 2 + (Math.random() * 2 - 1) * spreadX;
+  const cy = h * .42 + (Math.random() * 2 - 1) * spreadY;
+  const startScale = isCrit ? 1.15 : .85;
+  const endScale = isCrit ? 1.35 : 1.05;
+  slot.busy = true;
+  clearTimeout(slot.timer);
+  slot.el.className = "dmgNum" + (isCrit ? " crit" : "");
+  slot.el.textContent = fmtAbbr(Math.round(amount));
+  slot.el.style.fontSize = isCrit ? "34px" : "26px";
+  slot.el.style.display = "block";
+  slot.el.style.transition = "none";
+  slot.el.style.transform = `translate(${cx}px, ${cy}px) scale(${startScale})`;
+  slot.el.style.opacity = "1";
+  void slot.el.offsetWidth;
+  slot.el.style.transition = `transform ${fade}s ease-out, opacity ${fade}s ease-in`;
+  slot.el.style.transform = `translate(${cx}px, ${cy - 36}px) scale(${endScale})`;
+  slot.el.style.opacity = "0";
+  slot.timer = setTimeout(() => {
+    slot.el.style.display = "none";
+    slot.busy = false;
+  }, fade * 1000 + 40);
 }
 
 const _attackRay = new THREE.Ray;
@@ -13705,6 +13994,7 @@ function atkCursor() {
   const ehActive = isActive();
   const wep = ehActive ? mergedItem() : heldSlot ? wpnInfo(heldSlot.type) : null;
   let dmg;
+  let isCrit = false;
   if (wep) {
     const comboKey = ehActive ? "event_horizon" : heldSlot.type;
     if (__horizonWeaponComboType !== comboKey) {
@@ -13718,6 +14008,7 @@ function atkCursor() {
     }
     if (wep.stats.critChance && Math.random() < wep.stats.critChance) {
       dmg *= wep.stats.critMult || 1.5;
+      isCrit = true;
     }
     if (wep.stats.thirdHitMult && __horizonWeaponComboCount % 3 === 0) {
       dmg *= wep.stats.thirdHitMult;
@@ -13727,6 +14018,7 @@ function atkCursor() {
           expire: nowSec() + (wep.stats.hemorrhageDuration || 3),
           pct: wep.stats.hemorrhagePctPerSec
         });
+        setMonsterStatusFx(best, "hemorrhage", "#4fdc7a", wep.stats.hemorrhageDuration || 3);
       }
     }
     if (wep.stats.knockbackPct) {
@@ -13785,6 +14077,8 @@ function atkCursor() {
   const aoeFraction = best.maxHp > 0 ? dmg / best.maxHp : 0;
   const aoeRadius = aoeRadiusForFraction(aoeFraction) + (wep && wep.stats && wep.stats.extraAoeRadius || 0);
   spawnHitFx(best.x, best.y, best.z, aoeRadius);
+  if (wep) spawnSliceFx(best.x, best.y, best.z);
+  spawnDamageNumber(dmg, isCrit);
   playHitSfx();
   if (wep && wep.stats && wep.stats.bossSplitChance && !(best.consolidationMult && best.consolidationMult > 1.001) && (best.isBoss || best.isSuperboss || best.isUltraboss) && Math.random() < wep.stats.bossSplitChance) {
     splitMonster(best);
